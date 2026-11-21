@@ -1,0 +1,251 @@
+{% extends 'base.html' %}
+
+{% block title %}Área Creativa - {{ cliente.nombre }}{% endblock %}
+
+{% block styles %}
+{% include 'clientes/_estilos.html' %}
+<style>
+    .ficha-tabs .nav-link { border-radius: 50px; color: #6c757d; font-weight: 600; }
+    .ficha-tabs .nav-link.active { background: #1d63ed; color: #fff; }
+    .ficha-tabla td, .ficha-tabla th { vertical-align: top; }
+    .ficha-tabla .num { text-align: right; white-space: nowrap; }
+    .ficha-tabla ul.productos { margin: 0; padding-left: 1rem; }
+    .stat-caja { background: #f3f4f6; border-radius: 10px; padding: 10px 14px; height: 100%; }
+    .stat-caja span { display: block; font-size: .75rem; text-transform: uppercase; color: #6b7280; }
+    .stat-caja strong { font-size: 1.15rem; }
+    .barra { background: #e9ecef; border-radius: 4px; height: 10px; min-width: 80px; }
+    .barra > div { background: #1d63ed; border-radius: 4px; height: 100%; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% macro productos(p) %}
+{% if p.detalles %}
+<ul class="productos">
+    {% for d in p.detalles %}<li>{{ '%g'|format(d.cantidad|float) }} × {{ d.descripcion }}</li>{% endfor %}
+</ul>
+{% else %}{{ p.resumen_descripcion }}{% endif %}
+{% endmacro %}
+
+{% macro dinero(valor) %}${{ '{:,.2f}'.format(valor) }}{% endmacro %}
+<div class="container mt-4 mb-5 pf-form" style="max-width: 1000px;">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <h4 class="mb-0 fw-bold">
+            <span class="text-muted fw-normal">{{ cliente.clave }}</span> {{ cliente.nombre }}
+            {% if not cliente.activo %}<span class="badge text-bg-secondary align-middle ms-1">Inactivo</span>{% endif %}
+        </h4>
+        <div class="d-flex gap-2 flex-wrap">
+            {% if puede('clientes.editar') %}
+            <button type="button" class="btn btn-primary rounded-pill px-3" data-bs-toggle="modal"
+                    data-bs-target="#editarCliente-{{ cliente.id_cliente }}"><i class="bi bi-pencil me-1"></i>Editar</button>
+            {% endif %}
+            {% if puede('clientes.crear') %}
+            <button type="button" class="btn btn-outline-primary rounded-pill px-3" data-bs-toggle="modal"
+                    data-bs-target="#completarCliente-{{ cliente.id_cliente }}">Completar datos</button>
+            {% endif %}
+            <a href="{{ url_for('clientes.nota_activos', id_cliente=cliente.id_cliente) }}" target="_blank"
+               class="btn btn-outline-secondary rounded-pill px-3"><i class="bi bi-printer me-1"></i>Nota de pedidos activos</a>
+            <a href="{{ url_for('clientes.lista') }}" class="btn btn-outline-dark rounded-pill px-3">Volver</a>
+        </div>
+    </div>
+
+    <div class="form-card">
+        <h5 class="section-title">Datos del cliente</h5>
+        <dl class="row mb-0">
+            <dt class="col-sm-3 text-muted fw-normal">Teléfono</dt>
+            <dd class="col-sm-9">
+                {% if cliente.whatsapp_url %}
+                <a href="{{ cliente.whatsapp_url }}" target="_blank" rel="noopener noreferrer" class="text-decoration-none">
+                    <i class="bi bi-whatsapp text-success me-1"></i>{{ cliente.telefono }}</a>
+                {% else %}{{ cliente.telefono }}{% endif %}
+            </dd>
+            <dt class="col-sm-3 text-muted fw-normal">Correo</dt>
+            <dd class="col-sm-9">{{ cliente.correo or '—' }}</dd>
+            <dt class="col-sm-3 text-muted fw-normal">Tipo</dt>
+            <dd class="col-sm-9">{{ cliente.tipo or 'Particular' }}</dd>
+            <dt class="col-sm-3 text-muted fw-normal">RFC</dt>
+            <dd class="col-sm-9">{{ cliente.rfc or '—' }}</dd>
+            <dt class="col-sm-3 text-muted fw-normal">Razón social</dt>
+            <dd class="col-sm-9">{{ cliente.razon_social or '—' }}</dd>
+            <dt class="col-sm-3 text-muted fw-normal">Notas</dt>
+            <dd class="col-sm-9">{{ cliente.notas|enlazar if cliente.notas else '—' }}</dd>
+            <dt class="col-sm-3 text-muted fw-normal">Alta</dt>
+            <dd class="col-sm-9 mb-0">{{ cliente.fecha_alta.strftime('%d/%m/%Y') if cliente.fecha_alta else '—' }}</dd>
+        </dl>
+        {% if puede('productos.administrar') %}
+        <form method="post" action="{{ url_for('clientes.asignar_lista', id_cliente=cliente.id_cliente) }}" class="row g-2 align-items-end mt-3">
+            <div class="col-md-8">
+                <label class="form-label mb-1" for="listaPrecioCliente">Lista de precios</label>
+                <select class="form-select" id="listaPrecioCliente" name="id_lista_precio">
+                    <option value="">Predeterminada del sistema</option>
+                    {% for lista in listas_precio %}
+                    <option value="{{ lista.id_lista }}" {% if cliente.id_lista_precio == lista.id_lista %}selected{% endif %}>{{ lista.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4"><button type="submit" class="btn btn-outline-primary rounded-pill px-4">Guardar lista</button></div>
+        </form>
+        {% endif %}
+    </div>
+
+    <ul class="nav nav-pills ficha-tabs gap-2 mb-3" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link {{ 'active' if pestana == 'activos' }}" id="tab-activos" data-bs-toggle="pill"
+                    data-bs-target="#panel-activos" type="button" role="tab" aria-controls="panel-activos"
+                    aria-selected="{{ 'true' if pestana == 'activos' else 'false' }}">
+                Pedidos activos <span class="badge text-bg-light ms-1">{{ activos|length }}</span></button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link {{ 'active' if pestana == 'historial' }}" id="tab-historial" data-bs-toggle="pill"
+                    data-bs-target="#panel-historial" type="button" role="tab" aria-controls="panel-historial"
+                    aria-selected="{{ 'true' if pestana == 'historial' else 'false' }}">
+                Historial <span class="badge text-bg-light ms-1">{{ historial.total }}</span></button>
+        </li>
+        {% if estadisticas is not none and puede('clientes.estadisticas') %}
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-estadisticas" data-bs-toggle="pill" data-bs-target="#panel-estadisticas"
+                    type="button" role="tab" aria-controls="panel-estadisticas" aria-selected="false">Estadísticas</button>
+        </li>
+        {% endif %}
+    </ul>
+
+    <div class="tab-content">
+        {# ---------- Pedidos activos ---------- #}
+        <div class="tab-pane fade {{ 'show active' if pestana == 'activos' }}" id="panel-activos" role="tabpanel"
+             aria-labelledby="tab-activos" tabindex="0">
+            <div class="form-card">
+                {% if activos %}
+                <div class="table-responsive">
+                    <table class="table table-sm ficha-tabla mb-0">
+                        <thead>
+                            <tr>
+                                <th>Folio</th><th>Entrega</th><th>Productos</th><th>Estatus</th>
+                                <th class="num">Total</th><th class="num">Pagado</th><th class="num">Saldo</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for p in activos %}
+                            <tr>
+                                <td class="fw-bold text-nowrap">{{ p.folio }}</td>
+                                <td class="text-nowrap">{{ p.fecha_entrega.strftime('%d/%m/%Y') if p.fecha_entrega else '—' }}</td>
+                                <td>{{ productos(p) }}</td>
+                                <td><span class="badge {{ 'text-bg-success' if p.estatus == 'Terminado' else 'text-bg-warning' }}">{{ p.estatus }}</span></td>
+                                <td class="num">{{ dinero(p.total_float) }}</td>
+                                <td class="num">{{ dinero(p.total_pagado) }}</td>
+                                <td class="num fw-semibold">{{ dinero(p.saldo_restante) }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr class="fw-bold">
+                                <td colspan="4" class="text-end">Totales · saldo por liquidar</td>
+                                <td class="num">{{ dinero(totales.total) }}</td>
+                                <td class="num">{{ dinero(totales.pagado) }}</td>
+                                <td class="num text-primary">{{ dinero(totales.saldo) }}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted mb-0">El cliente no tiene pedidos activos.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        {# ---------- Historial (Entregado / Cancelado) ---------- #}
+        <div class="tab-pane fade {{ 'show active' if pestana == 'historial' }}" id="panel-historial" role="tabpanel"
+             aria-labelledby="tab-historial" tabindex="0">
+            <div class="form-card">
+                {% if historial.items %}
+                <div class="table-responsive">
+                    <table class="table table-sm ficha-tabla mb-0">
+                        <thead>
+                            <tr><th>Folio</th><th>Fecha</th><th>Productos</th><th>Estatus</th><th class="num">Total</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for p in historial.items %}
+                            <tr class="{{ 'text-muted' if p.estatus == 'Cancelado' }}">
+                                <td class="fw-bold text-nowrap">{{ p.folio }}</td>
+                                <td class="text-nowrap">{{ p.fecha_creacion.strftime('%d/%m/%Y') if p.fecha_creacion else '—' }}</td>
+                                <td>{{ productos(p) }}</td>
+                                <td><span class="badge {{ 'text-bg-secondary' if p.estatus == 'Cancelado' else 'text-bg-primary' }}">{{ p.estatus }}</span></td>
+                                <td class="num">{{ dinero(p.total_float) }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% if historial.pages > 1 %}
+                <div class="d-flex justify-content-between align-items-center mt-3">
+                    <span class="small text-muted">Página {{ historial.page }} de {{ historial.pages }} · {{ historial.total }} pedidos</span>
+                    <div class="btn-group">
+                        {% if historial.has_prev %}<a class="btn btn-sm btn-outline-primary" href="{{ url_for('clientes.ficha', id_cliente=cliente.id_cliente, pagina=historial.prev_num) }}">← Anterior</a>{% endif %}
+                        {% if historial.has_next %}<a class="btn btn-sm btn-outline-primary" href="{{ url_for('clientes.ficha', id_cliente=cliente.id_cliente, pagina=historial.next_num) }}">Siguiente →</a>{% endif %}
+                    </div>
+                </div>
+                {% endif %}
+                {% else %}
+                <p class="text-muted mb-0">Sin pedidos entregados o cancelados.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        {# ---------- Estadísticas: solo se renderiza con clientes.estadisticas ---------- #}
+        {% if estadisticas is not none and puede('clientes.estadisticas') %}
+        <div class="tab-pane fade" id="panel-estadisticas" role="tabpanel" aria-labelledby="tab-estadisticas" tabindex="0">
+            <div class="form-card">
+                <div class="row g-2 mb-4">
+                    <div class="col-6 col-md"><div class="stat-caja"><span>Total comprado</span><strong>{{ dinero(estadisticas.total_comprado) }}</strong></div></div>
+                    <div class="col-6 col-md"><div class="stat-caja"><span>Pedidos</span><strong>{{ estadisticas.num_pedidos }}</strong></div></div>
+                    <div class="col-6 col-md"><div class="stat-caja"><span>Ticket promedio</span><strong>{{ dinero(estadisticas.ticket_promedio) }}</strong></div></div>
+                    <div class="col-6 col-md"><div class="stat-caja"><span>Saldo por liquidar</span><strong>{{ dinero(estadisticas.saldo_activos) }}</strong></div></div>
+                    <div class="col-12 col-md"><div class="stat-caja"><span>Último pedido</span><strong>{{ estadisticas.ultimo_pedido.strftime('%d/%m/%Y') if estadisticas.ultimo_pedido else '—' }}</strong></div></div>
+                </div>
+
+                <div class="row g-4">
+                    <div class="col-md-7">
+                        <h6 class="section-title">Últimos 12 meses</h6>
+                        <table class="table table-sm ficha-tabla mb-0">
+                            <thead><tr><th>Mes</th><th class="num">Pedidos</th><th class="num">Monto</th><th class="w-50"></th></tr></thead>
+                            <tbody>
+                                {% for m in estadisticas.mensual %}
+                                <tr>
+                                    <td class="text-nowrap">{{ m.etiqueta }}</td>
+                                    <td class="num">{{ m.pedidos }}</td>
+                                    <td class="num">{{ dinero(m.monto) }}</td>
+                                    <td class="align-middle"><div class="barra"><div style="width: {{ m.porcentaje }}%;"></div></div></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="col-md-5">
+                        <h6 class="section-title">Top 5 productos</h6>
+                        {% if estadisticas.top_productos %}
+                        <table class="table table-sm ficha-tabla mb-0">
+                            <thead><tr><th>Producto</th><th class="num">Cantidad</th></tr></thead>
+                            <tbody>
+                                {% for prod in estadisticas.top_productos %}
+                                <tr><td>{{ prod.descripcion }}</td><td class="num">{{ '%g'|format(prod.cantidad) }}</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        {% else %}
+                        <p class="text-muted mb-0">Sin productos registrados.</p>
+                        {% endif %}
+                    </div>
+                </div>
+                <p class="small text-muted mt-3 mb-0">No incluye pedidos cancelados.</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if puede('clientes.crear') %}
+    {% include 'clientes/_modal_completar.html' %}
+    {% endif %}
+    {% if puede('clientes.editar') %}
+    {% include 'clientes/_modal_editar.html' %}
+    {% endif %}
+</div>
+{% endblock %}

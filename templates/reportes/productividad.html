@@ -1,0 +1,128 @@
+{% extends 'base.html' %}
+{% block title %}Área Creativa - Productividad{% endblock %}
+{% block styles %}{% include 'reportes/_estilos.html' %}{% endblock %}
+
+{% block content %}
+{% from 'reportes/_macros.html' import dinero %}
+{% set t = datos.totales %}
+<div class="rep-wrap">
+  {% with tab='productividad' %}{% include 'reportes/_tabs.html' %}{% endwith %}
+
+  <form method="get" id="form-rep" class="rep-card rep-filtros no-print">
+    <div class="row g-2 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label small fw-bold text-muted mb-1">Operador</label>
+        <select name="operador" class="form-select">
+          <option value="">Todos</option>
+          {% for o in operadores %}<option value="{{ o.id_usuario }}" {% if operador == o.id_usuario %}selected{% endif %}>{{ o.nombre }}{{ '' if o.activo else ' (inactivo)' }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label small fw-bold text-muted mb-1">Desde</label>
+        <input type="date" name="desde" id="desde" class="form-control" value="{{ desde }}">
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label small fw-bold text-muted mb-1">Hasta</label>
+        <input type="date" name="hasta" id="hasta" class="form-control" value="{{ hasta }}">
+      </div>
+      <div class="col-md-5 d-flex flex-wrap gap-2 justify-content-md-end">
+        <div class="btn-group">
+          <button type="button" class="btn btn-outline-secondary rounded-start-pill" onclick="fijarRango('hoy')">Hoy</button>
+          <button type="button" class="btn btn-outline-secondary" onclick="fijarRango('semana')">Semana</button>
+          <button type="button" class="btn btn-outline-secondary rounded-end-pill" onclick="fijarRango('mes')">Mes</button>
+        </div>
+        <button type="submit" class="btn btn-primary rounded-pill px-4">Aplicar</button>
+        <div class="dropdown">
+          <button class="btn btn-outline-success rounded-pill dropdown-toggle" type="button" data-bs-toggle="dropdown">CSV</button>
+          <ul class="dropdown-menu">
+            <li><a class="dropdown-item" href="{{ url_for('reportes.productividad', desde=desde, hasta=hasta, operador=operador, formato='csv') }}">Resumen por operador</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('reportes.productividad', desde=desde, hasta=hasta, operador=operador, formato='csv_detalle') }}">Detalle por pedido</a></li>
+          </ul>
+        </div>
+        <button type="button" class="btn btn-outline-dark rounded-pill" onclick="window.print()">PDF / Imprimir</button>
+      </div>
+    </div>
+  </form>
+
+  <div class="rep-membrete">
+    <h4 class="fw-bold mb-0">Reporte de productividad por operador</h4>
+    <div class="small text-muted">{{ config.get('NOMBRE_CLIENTE', 'Área Creativa') }} · Pedidos terminados del {{ desde.strftime('%d/%m/%Y') }} al {{ hasta.strftime('%d/%m/%Y') }} · Generado {{ generado.strftime('%d/%m/%Y %I:%M %p') }}</div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-6 col-lg-3"><div class="kpi"><small>Pedidos finalizados</small><strong>{{ t.pedidos }}</strong></div></div>
+    <div class="col-6 col-lg-3"><div class="kpi"><small>Piezas elaboradas</small><strong>{{ '%g'|format(t.piezas) }}</strong></div></div>
+    <div class="col-6 col-lg-3"><div class="kpi"><small>Terminados a tiempo</small>
+      <strong class="{{ 'text-success' if t.pct is not none and t.pct >= 90 else 'text-warning' if t.pct is not none and t.pct >= 70 else 'text-danger' }}">{{ (t.pct ~ '%') if t.pct is not none else '—' }}</strong></div></div>
+    <div class="col-6 col-lg-3"><div class="kpi"><small>Tiempo promedio de producción</small><strong>{{ t.promedio_txt }}</strong></div></div>
+  </div>
+
+  <div class="rep-card">
+    <h5>Rendimiento por operador</h5>
+    <div class="table-responsive">
+      <table class="table table-sm rep-table mb-0">
+        <thead><tr><th>Operador</th><th class="num">Pedidos</th><th class="num">Piezas</th><th class="num">A tiempo</th><th class="num">Con retraso</th><th class="num">% a tiempo</th><th class="num">Tiempo promedio</th></tr></thead>
+        <tbody>
+          {% for f in datos.filas %}
+          <tr>
+            <td class="fw-semibold">{{ f.operador }}</td>
+            <td class="num">{{ f.pedidos }}</td>
+            <td class="num">{{ '%g'|format(f.piezas) }}</td>
+            <td class="num text-success">{{ f.a_tiempo }}</td>
+            <td class="num text-danger">{{ f.retraso }}</td>
+            <td class="num">
+              {% if f.pct is not none %}
+              <div class="d-flex align-items-center gap-2 justify-content-end">
+                <div class="progress" style="width:90px;height:8px;">
+                  <div class="progress-bar {{ 'bg-success' if f.pct >= 90 else 'bg-warning' if f.pct >= 70 else 'bg-danger' }}" style="width: {{ f.pct }}%"></div>
+                </div>
+                <span class="fw-semibold">{{ f.pct }}%</span>
+              </div>
+              {% else %}—{% endif %}
+            </td>
+            <td class="num">{{ f.promedio_txt }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="7" class="text-center text-muted py-4">Sin operadores para mostrar.</td></tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr><td>Total (pedidos distintos)</td><td class="num">{{ t.pedidos }}</td><td class="num">{{ '%g'|format(t.piezas) }}</td>
+              <td class="num">{{ t.a_tiempo }}</td><td class="num">{{ t.retraso }}</td>
+              <td class="num">{{ (t.pct ~ '%') if t.pct is not none else '—' }}</td><td class="num">{{ t.promedio_txt }}</td></tr>
+        </tfoot>
+      </table>
+    </div>
+    <div class="small text-muted mt-2">
+      Un pedido con varios responsables cuenta completo para cada uno; el total general lo cuenta una sola vez.
+      "A tiempo" = terminado antes o en la fecha y hora de entrega pactada. Solo aparecen pedidos terminados desde que se registra la fecha de término.
+    </div>
+  </div>
+
+  <div class="rep-card permitir-corte">
+    <h5>Detalle por pedido ({{ datos.detalle|length }})</h5>
+    <div class="table-responsive">
+      <table class="table table-sm rep-table mb-0">
+        <thead><tr><th>Folio</th><th>Operador(es)</th><th>Entrega pactada</th><th>Terminado</th><th class="num">Piezas</th><th>Resultado</th></tr></thead>
+        <tbody>
+          {% for d in datos.detalle %}
+          <tr>
+            <td class="fw-semibold">{{ d.folio }}</td>
+            <td>{{ d.operadores }}</td>
+            <td class="text-nowrap">{{ d.entrega.strftime('%d/%m/%Y %I:%M %p') }}</td>
+            <td class="text-nowrap">{{ d.terminado.strftime('%d/%m/%Y %I:%M %p') }}</td>
+            <td class="num">{{ '%g'|format(d.piezas) }}</td>
+            <td>{% if d.a_tiempo %}<span class="badge text-bg-success">A tiempo</span>
+                {% else %}<span class="badge text-bg-danger">Retraso {{ d.retraso_txt }}</span>{% endif %}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6" class="text-center text-muted py-4">Ningún pedido terminado en este rango.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}{% include 'reportes/_rango_js.html' %}{% endblock %}

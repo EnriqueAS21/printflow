@@ -1,0 +1,88 @@
+/* Formulario de pedidos: alta (tablero, caja, nuevo pedido) y edición (tablero). */
+.modal-pedido { width: 95vw; max-width: 1600px; }
+@media (max-width: 991.98px) {
+    .modal-pedido.modal-fullscreen-lg-down { width: 100%; max-width: none; margin: 0; }
+}
+/* El modal de la nota es hijo de una .row: sin esto hereda su margen y relleno. */
+.pf-form .pf-layout > .modal { margin-top: 0; padding-right: 0; padding-left: 0; }
+.pf-form .form-card {
+    background: #ffffff;
+    border-radius: 12px;
+    border: none;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    padding: 20px;
+    margin-bottom: 20px;
+}
+.pf-form .section-title { color: #6c757d; font-size: 1.1rem; font-weight: 600; margin-bottom: 15px; }
+.pf-form .btn-custom-save { background-color: #198754; color: white; }
+.pf-form .btn-custom-send { background-color: #ffc107; color: #000; }
+.pf-form .form-control, .pf-form .form-select { border-radius: 50px; background-color: #F2F2F2; }
+.pf-form .factura-mayusculas { text-transform: uppercase; }
+.pf-form textarea.form-control { border-radius: 16px; }
+.pf-form .panel-desplegable-animado { transition: all 0.3s ease-in-out; }
+.pf-cliente-sugerencias {
+    position: fixed; z-index: 1060;
+    max-height: 280px; overflow-y: auto; border-radius: 16px;
+}
+.pf-cliente-sugerencias .list-group-item.active { color: inherit; background: #e8f0ff; border-color: #e8f0ff; }
+.pf-form .pf-lista-etiqueta { font-weight: 500; }
+.pf-form .nota-preview-sticky { position: sticky; top: 1rem; }
+.pf-form .nota-preview-content {
+    position: relative; width: 100%; max-height: 85vh; overflow-x: hidden; overflow-y: auto;
+}
+.pf-form .nota-preview-iframe {
+    position: absolute; top: 0; left: 0; display: block; width: 816px; border: 0;
+    transform-origin: top left;
+}
+.pf-form .tabla-productos-dinamica { width: 100%; min-width: 640px; table-layout: fixed; }
+.pf-form .tabla-productos-dinamica th { white-space: nowrap; }
+.pf-form .tabla-productos-dinamica tbody td { vertical-align: top; }
+.pf-form .tabla-productos-dinamica input[type="number"] {
+    -moz-appearance: textfield; appearance: textfield;
+}
+.pf-form .tabla-productos-dinamica input[type="number"]::-webkit-inner-spin-button,
+.pf-form .tabla-productos-dinamica input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none; margin: 0;
+}
+
+/* Barra superior (fecha, hora, folio + acciones) a todo el ancho del modal */
+.modal .pf-form .pf-barra { position: sticky; top: 0; z-index: 5; }
+.pf-form .pf-barra .btn { white-space: nowrap; }
+/* Vista previa oculta: el formulario ocupa todo el ancho */
+.pf-form.pf-sin-preview .nota-preview-panel { display: none !important; }
+.pf-form.pf-sin-preview .pf-col-form { flex: 0 0 100%; max-width: 100%; }
+/* Cliente, teléfono, fecha y hora en una sola fila */
+.pf-form .pf-fila-cliente {
+    display: grid; gap: 0.75rem; align-items: start;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1.3fr) minmax(0, 1.25fr) minmax(0, 1fr);
+}
+.pf-form .pf-cliente-pastilla {
+    position: absolute; top: 0; right: 6px; height: 38px;
+    display: flex; align-items: center; gap: 0.25rem;
+}
+.pf-form .pf-cliente-buscador:has(.pf-cliente-pastilla:not(.d-none)) .pf-cliente-nombre { padding-right: 9.5rem; }
+.pf-form .pf-atajos-separador { width: 1px; height: 20px; background: #ced4da; margin: 0 0.4rem; }
+/* Pago: métodos, cantidad y Liquidó en una fila */
+.pf-form .pf-cantidad-pago { width: 130px; }
+.pf-form .tabla-registro-pagos { font-size: 0.9rem; }
+@media (max-width: 575.98px) {
+    .pf-form .pf-fila-cliente { grid-template-columns: minmax(0, 1fr); }
+    .pf-form .pf-atajos-separador { display: none; }
+    .pf-form .pf-fila-pago > div, .pf-form .pf-cantidad-pago { width: 100%; margin-left: 0 !important; }
+    .pf-form .pf-fila-pago .btn-liquidar { width: 100%; }
+}
+
+/* Segunda línea: casilla a la izquierda, atajos a la derecha */
+.pf-form .pf-atajos { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 0.5rem; }
+.pf-form .pf-atajos .pf-guardar-cliente { padding-left: 1.5em; }
+.pf-form .pf-atajos-grupo { margin-left: auto; }
+/* Misma altura y relleno en los cuatro inputs de la fila (el de hora/fecha del navegador es más alto) */
+.pf-form .pf-fila-cliente .form-control {
+    height: calc(1.5em + 0.75rem + 2px); padding: 0.375rem 0.75rem; line-height: 1.5;
+}
+.pf-form .pf-fila-cliente input[type="date"]::-webkit-datetime-edit,
+.pf-form .pf-fila-cliente input[type="time"]::-webkit-datetime-edit { padding: 0; line-height: 1.5; }
+@media (max-width: 575.98px) {
+    .pf-form .pf-atajos .pf-guardar-cliente { flex: 0 0 100%; }
+    .pf-form .pf-atajos-grupo { margin-left: 0; }
+}

@@ -1,0 +1,67 @@
+{# Modal "Editar cliente" (solo clientes.editar). Requiere `cliente` y `tipos`.
+   A diferencia de "Completar datos", sobrescribe cualquier campo. #}
+{% set mid = 'editarCliente-' ~ cliente.id_cliente %}
+<div class="modal fade pf-form" id="{{ mid }}" tabindex="-1" aria-labelledby="{{ mid }}-titulo" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form class="modal-content" method="POST"
+              action="{{ url_for('clientes.editar', id_cliente=cliente.id_cliente) }}">
+            <div class="modal-header border-0">
+                <h5 class="modal-title" id="{{ mid }}-titulo">Editar {{ cliente.clave }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body pt-0">
+                <div class="mb-3">
+                    <label class="form-label small text-muted" for="{{ mid }}-nombre">Nombre</label>
+                    <input type="text" class="form-control" id="{{ mid }}-nombre" name="nombre" maxlength="120" style="text-transform: uppercase" required
+                           value="{{ cliente.nombre }}">
+                </div>
+                <div class="row g-3 mb-3">
+                    <div class="col-sm-6">
+                        <label class="form-label small text-muted" for="{{ mid }}-telefono">Teléfono</label>
+                        <input type="tel" class="form-control" id="{{ mid }}-telefono" name="telefono" maxlength="25" required
+                               value="{{ cliente.telefono }}">
+                    </div>
+                    <div class="col-sm-6">
+                        <label class="form-label small text-muted" for="{{ mid }}-tipo">Tipo</label>
+                        <select class="form-select" id="{{ mid }}-tipo" name="tipo">
+                            {% for t in tipos %}
+                            <option value="{{ t }}" {% if (cliente.tipo or 'Particular') == t %}selected{% endif %}>{{ t }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small text-muted" for="{{ mid }}-correo">Correo</label>
+                    <input type="email" class="form-control" id="{{ mid }}-correo" name="correo" maxlength="120" autocapitalize="off"
+                           value="{{ cliente.correo or '' }}">
+                </div>
+                <div class="row g-3 mb-3">
+                    <div class="col-sm-5">
+                        <label class="form-label small text-muted" for="{{ mid }}-rfc">RFC</label>
+                        <input type="text" class="form-control text-uppercase" id="{{ mid }}-rfc" name="rfc" maxlength="13" style="text-transform: uppercase"
+                               value="{{ cliente.rfc or '' }}">
+                    </div>
+                    <div class="col-sm-7">
+                        <label class="form-label small text-muted" for="{{ mid }}-razon">Razón social</label>
+                        <input type="text" class="form-control" id="{{ mid }}-razon" name="razon_social" maxlength="150" style="text-transform: uppercase"
+                               value="{{ cliente.razon_social or '' }}">
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small text-muted" for="{{ mid }}-notas">Notas</label>
+                    <textarea class="form-control" id="{{ mid }}-notas" name="notas" rows="3"
+                              maxlength="2000">{{ cliente.notas or '' }}</textarea>
+                </div>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" role="switch" id="{{ mid }}-activo" name="activo"
+                           value="1" {% if cliente.activo %}checked{% endif %}>
+                    <label class="form-check-label" for="{{ mid }}-activo">Cliente activo</label>
+                </div>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" class="btn btn-primary rounded-pill px-4 fw-semibold">Guardar cambios</button>
+            </div>
+        </form>
+    </div>
+</div>

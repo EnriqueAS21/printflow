@@ -1,0 +1,146 @@
+<style>
+  /* Por encima de cualquier modal de Bootstrap (1055) y de los avisos flotantes. */
+  #modalEfectivo { z-index: 1100; }
+  .modal-backdrop.pf-efectivo-backdrop { z-index: 1095; }
+
+  #modalEfectivo .modal-dialog { max-width: 620px; }
+  #modalEfectivo .modal-content { background: #fff; border: 0; border-radius: 28px; padding: 1.75rem; }
+  #modalEfectivo .modal-header,
+  #modalEfectivo .modal-footer { border: 0; padding: 0; }
+  #modalEfectivo .modal-header { justify-content: space-between; margin-bottom: 1rem; }
+  /* El relleno de 2px evita que el desplazamiento recorte el contorno de foco. */
+  #modalEfectivo .modal-body { margin-inline: -2px; padding: 2px; }
+  #modalEfectivo .modal-title { display: flex; align-items: center; gap: .6rem; font-size: 1.5rem; font-weight: 700; }
+  #modalEfectivo .pf-efectivo-titulo-icono { color: #3b8754; font-size: 2.25rem; line-height: 1; }
+  #modalEfectivo .pf-efectivo-cerrar {
+    display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; flex: none;
+    margin-right: -.5rem; background: none; border: 0; border-radius: 50%; color: #212529; font-size: 1.5rem;
+  }
+  #modalEfectivo .pf-efectivo-cerrar:hover { background: #f1f3f5; }
+
+  #modalEfectivo .pf-efectivo-etiqueta { font-weight: 400; margin-bottom: .4rem; }
+
+  /* Botones propios: base.html impone 44px de alto a .btn en móvil */
+  #modalEfectivo .pf-efectivo-boton {
+    display: inline-flex; align-items: center; justify-content: center; gap: .35rem;
+    background: var(--pf-fondo); border: 0; border-radius: 999px; color: var(--pf-texto, #fff);
+    font-weight: 700; white-space: nowrap; transition: background-color .15s, opacity .15s;
+  }
+  #modalEfectivo .pf-efectivo-boton:hover:not(:disabled) { background: var(--pf-hover); }
+  #modalEfectivo .pf-efectivo-boton:disabled { cursor: not-allowed; opacity: .45; }
+  #modalEfectivo button:focus-visible { outline: 2px solid #212529; outline-offset: 2px; }
+
+  #modalEfectivo .pf-efectivo-billetes { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .5rem; margin-bottom: 1rem; }
+  #modalEfectivo .pf-efectivo-billete { --pf-fondo: #e6f5ec; --pf-hover: #cfead9; --pf-texto: #3b8754; height: 44px; padding: 0; }
+
+  #modalEfectivo .pf-efectivo-monedas { display: flex; gap: .75rem; margin-bottom: 1rem; }
+  #modalEfectivo .pf-efectivo-moneda { --pf-fondo: #5cc6b2; --pf-hover: #49b39f; width: 64px; height: 64px; flex: none; border-radius: 50%; }
+
+  #modalEfectivo .pf-efectivo-exacto { --pf-fondo: #3b6ff5; --pf-hover: #2c5bd6; width: 100%; height: 30px; margin-bottom: 1rem; padding: 0; }
+
+  /* Tarjetas: tipografía de .kpi-label y .kpi-number de caja.html; el monto se reduce
+     porque 2.8rem no cabe en un tercio del modal. */
+  #modalEfectivo .pf-efectivo-tarjetas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .75rem; }
+  #modalEfectivo .pf-efectivo-tarjeta {
+    position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    min-width: 0; padding: 1.25rem .5rem; border-radius: 22px; color: #fff; text-align: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, .04);
+  }
+  #modalEfectivo .pf-efectivo-tarjeta-etiqueta { font-size: 1.05rem; font-weight: 500; margin-bottom: .15rem; }
+  #modalEfectivo .pf-efectivo-tarjeta-monto {
+    width: 100%; height: 1.1em; padding: 0; background: none; border: 0; color: inherit; text-align: center;
+    font-size: 1.8rem; font-weight: 700; letter-spacing: -1px; line-height: 1.1; white-space: nowrap;
+  }
+  #modalEfectivo .pf-efectivo-azul { background-color: #3b6ff5; }
+  #modalEfectivo .pf-efectivo-amarilla { background-color: #f6cf47; color: #000; cursor: pointer; }
+  #modalEfectivo .pf-efectivo-verde { background-color: #3b8754; }
+  #modalEfectivo .pf-efectivo-verde.pf-efectivo-falta { background-color: #e74c3c; }
+
+  #modalEfectivo input.pf-efectivo-tarjeta-monto { box-shadow: 0 2px 0 rgba(0, 0, 0, .55); outline: 0; appearance: textfield; -moz-appearance: textfield; }
+  #modalEfectivo input.pf-efectivo-tarjeta-monto::-webkit-outer-spin-button,
+  #modalEfectivo input.pf-efectivo-tarjeta-monto::-webkit-inner-spin-button { appearance: none; margin: 0; }
+
+  #modalEfectivo .pf-efectivo-reiniciar {
+    position: absolute; top: .4rem; right: .4rem; display: flex; align-items: center; justify-content: center;
+    width: 26px; height: 26px; padding: 0; background: none; border: 0; border-radius: 50%; color: #000; font-size: .95rem;
+  }
+  #modalEfectivo .pf-efectivo-reiniciar:hover { background: rgba(0, 0, 0, .12); }
+
+  /* Pie: base.html lo convierte en una rejilla de ancho completo en móvil */
+  #modalEfectivo .modal-footer { display: flex; flex-wrap: nowrap; justify-content: space-between; align-items: center; gap: .5rem; padding-top: 1.25rem; }
+  #modalEfectivo .modal-footer > * { width: auto; margin: 0; }
+  #modalEfectivo .pf-efectivo-atajos { font-size: .85rem; color: #6c757d; white-space: nowrap; }
+  #modalEfectivo .pf-efectivo-atajos kbd { background: #212529; color: #fff; }
+  #modalEfectivo .pf-efectivo-acciones { display: flex; gap: .5rem; margin-left: auto; }
+  #modalEfectivo .pf-efectivo-cancelar { --pf-fondo: #e74c3c; --pf-hover: #d13f30; height: 44px; padding: 0 1.5rem; }
+  #modalEfectivo .pf-efectivo-confirmar { --pf-fondo: #3b8754; --pf-hover: #30724a; height: 44px; padding: 0 1.5rem; }
+
+  @media (max-width: 575.98px) {
+    #modalEfectivo .modal-dialog { margin-inline: 0; }
+    #modalEfectivo .modal-content { padding: 1rem; }
+    #modalEfectivo .modal-title { font-size: 1.25rem; }
+    #modalEfectivo .pf-efectivo-billetes { gap: .25rem; }
+    #modalEfectivo .pf-efectivo-billete { font-size: .85rem; gap: .2rem; }
+    #modalEfectivo .pf-efectivo-tarjetas { gap: .4rem; }
+    #modalEfectivo .pf-efectivo-tarjeta { padding: .85rem .35rem; }
+    #modalEfectivo .pf-efectivo-tarjeta-etiqueta { font-size: .8rem; }
+    #modalEfectivo .pf-efectivo-tarjeta-monto { font-size: 1.1rem; letter-spacing: 0; }
+    #modalEfectivo .pf-efectivo-reiniciar { top: .15rem; right: .15rem; }
+    #modalEfectivo .modal-footer > .pf-efectivo-acciones { width: 100%; margin: 0; }
+    #modalEfectivo .pf-efectivo-acciones .pf-efectivo-boton { flex: 1; }
+  }
+</style>
+
+<!-- MODAL: COBRO EN EFECTIVO (window.cobrarEfectivo, static/js/modal_efectivo.js) -->
+<div class="modal fade" id="modalEfectivo" tabindex="-1" aria-labelledby="modalEfectivoTitulo" aria-hidden="true" data-bs-backdrop="static">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content shadow-lg">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalEfectivoTitulo"><i class="bi bi-cash pf-efectivo-titulo-icono" aria-hidden="true"></i>Cobro en efectivo</h5>
+        <button type="button" class="pf-efectivo-cerrar" data-bs-dismiss="modal" aria-label="Cerrar"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="pf-efectivo-etiqueta">Billetes</div>
+        <div class="pf-efectivo-billetes">
+          {% for billete in [20, 50, 100, 200, 500] %}
+          <button type="button" class="pf-efectivo-boton pf-efectivo-billete" data-efectivo-suma="{{ billete }}"><i class="bi bi-cash" aria-hidden="true"></i>${{ billete }}</button>
+          {% endfor %}
+        </div>
+
+        <div class="pf-efectivo-etiqueta">Monedas</div>
+        <div class="pf-efectivo-monedas">
+          {% for moneda in [10, 5] %}
+          <button type="button" class="pf-efectivo-boton pf-efectivo-moneda" data-efectivo-suma="{{ moneda }}">${{ moneda }}</button>
+          {% endfor %}
+        </div>
+
+        <button type="button" class="pf-efectivo-boton pf-efectivo-exacto" id="efectivoExacto">Exacto</button>
+
+        <div class="pf-efectivo-tarjetas" aria-live="polite">
+          <div class="pf-efectivo-tarjeta pf-efectivo-azul">
+            <div class="pf-efectivo-tarjeta-etiqueta">Total</div>
+            <div class="pf-efectivo-tarjeta-monto" id="efectivoTotal">$0.00</div>
+          </div>
+          <div class="pf-efectivo-tarjeta pf-efectivo-amarilla" id="efectivoTarjetaPago">
+            <button type="button" class="pf-efectivo-reiniciar" id="efectivoReiniciar" aria-label="Regresar a cero" title="Regresar a cero"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i></button>
+            <label class="pf-efectivo-tarjeta-etiqueta" for="efectivoRecibido">Pago con</label>
+            <button type="button" class="pf-efectivo-tarjeta-monto" id="efectivoPagado" aria-label="Escribir el monto recibido">$0.00</button>
+            <input type="number" step="0.01" min="0" inputmode="decimal" autocomplete="off"
+                   class="pf-efectivo-tarjeta-monto" id="efectivoRecibido" value="0" aria-label="Monto recibido" hidden>
+          </div>
+          <div class="pf-efectivo-tarjeta pf-efectivo-verde" id="efectivoTarjetaCambio">
+            <div class="pf-efectivo-tarjeta-etiqueta" id="efectivoEtiquetaCambio">Cambio</div>
+            <div class="pf-efectivo-tarjeta-monto" id="efectivoResultado">$0.00</div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <div class="pf-efectivo-atajos d-none d-sm-block"><kbd>Enter</kbd> confirmar · <kbd>Esc</kbd> cancelar</div>
+        <div class="pf-efectivo-acciones">
+          <button type="button" class="pf-efectivo-boton pf-efectivo-cancelar" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="pf-efectivo-boton pf-efectivo-confirmar" id="efectivoConfirmar" disabled>Confirmar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

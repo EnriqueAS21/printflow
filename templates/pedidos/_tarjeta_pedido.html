@@ -1,0 +1,258 @@
+{# Tarjeta de pedido compacta y expandible.
+   Requiere: pedido, columna ('en_proceso' | 'terminado' | 'entregado' | 'cancelado').
+   'cancelado' solo aparece en el historial: se puede leer, pero no tiene acciones. #}
+{% if columna is not defined %}
+  {% if pedido.estatus == 'Terminado' %}{% set columna = 'terminado' %}
+  {% elif pedido.estatus == 'Entregado' %}{% set columna = 'entregado' %}
+  {% elif pedido.estatus == 'Cancelado' %}{% set columna = 'cancelado' %}
+  {% else %}{% set columna = 'en_proceso' %}{% endif %}
+{% endif %}
+{% set solo_lectura = columna == 'cancelado' %}
+{% set puede_gestionar = puede('pedidos.gestionar') %}
+{% set ver_cliente = true %}
+{% set ver_comercial = puede('caja.ver') %}   {# datos de dinero #}
+{% set tid = 'extra-' ~ pedido.id_pedido %}
+{% set f = pedido.fecha_entrega %}
+{% set minutos = f.strftime('%M') %}
+{% set btn_editar = puede_gestionar and columna != 'entregado' and not solo_lectura %}
+{% set btn_terminar = columna == 'en_proceso' and puede('dashboard.terminar') %}
+{% set btn_entregar = columna == 'terminado' and puede('dashboard.entregar') %}
+{% set btn_imprimir = puede('pedidos.imprimir') and not solo_lectura %}
+{% set btn_etiqueta = (puede('etiquetas.imprimir') or puede_gestionar) and not solo_lectura %}
+{% set btn_cobrar = puede_gestionar and ver_comercial and pedido.saldo_restante > 0 and not solo_lectura %}
+{% set ids_resp = pedido.responsables_asignados|map(attribute='id_usuario')|list %}
+{% if pedido.id_usuario_produccion and pedido.id_usuario_produccion not in ids_resp %}{% set ids_resp = ids_resp + [pedido.id_usuario_produccion] %}{% endif %}
+{% from 'pedidos/_info_produccion.html' import info_produccion, boton_terminar with context %}
+
+
+<div class="pedido-card card-pedido {% if columna == 'entregado' %}opacity-75 pc-entregado{% endif %}"
+     data-id-pedido="{{ pedido.id_pedido }}"
+     data-estatus="{{ pedido.estatus }}"
+     data-orden="{{ f.isoformat() }}"
+     data-entregado="{{ (pedido.fecha_entregado or f).isoformat() }}"
+     data-terminado="{{ (pedido.fecha_terminado or f).isoformat() }}"
+     data-folio="{{ pedido.folio | lower }}"
+     data-responsable="{{ (pedido.responsables_asignados|map(attribute='nombre')|join('|') or 'Sin asignar')|lower }}"
+     data-fecha="{{ f.strftime('%Y-%m-%d') }}"
+     data-entrega="{{ f.isoformat() }}"
+     data-responsables="{{ ids_resp|join(',') }}"
+     {% if ver_cliente %}
+     data-cliente="{{ pedido.nombre_cliente | lower }}"
+     data-telefono="{{ pedido.telefono_cliente | lower }}"
+     {% endif %}
+     {% if ver_comercial %}
+     data-pago="{{ pedido.estado_pago | lower }}"
+     data-saldo="{{ '%.2f'|format(pedido.saldo_restante) }}"
+     {% endif %}>
+
+    <!-- ===== Vista compacta ===== -->
+  <div class="pc-grid">
+    <div class="pc-folio">{{ pedido.folio }}</div>
+    {% if ver_comercial %}
+    <div class="pc-badge">
+      <span class="badge-payment {% if pedido.estado_pago == 'Pagado' %}pagado{% elif pedido.estado_pago == 'Anticipo' %}anticipo{% else %}sin-pagar{% endif %}">
+        <i class="bi bi-cash-stack"></i> {{ pedido.estado_pago }}
+      </span>
+    </div>
+    {% endif %}
+    {% if ver_cliente %}
+    <div class="pc-cliente" title="{{ pedido.nombre_cliente }}">{{ pedido.nombre_cliente }}</div>
+    {% endif %}
+    {% if columna != 'entregado' and pedido.detalles %}
+    {% set d0 = pedido.detalles|first %}
+    {% set extra_prod = pedido.detalles|length - 1 %}
+    <div class="pc-producto">
+      <span class="pc-producto-txt" title="{{ d0.descripcion }}">{{ '%g'|format(d0.cantidad|float) }}× {{ d0.descripcion|upper }}</span>
+      {% if extra_prod > 0 %}<span class="pc-producto-mas">+{{ extra_prod }}</span>{% endif %}
+    </div>
+    {% endif %}
+    {# El texto lo recalcula actualizarFechasTarjetas() (dashboard.html); este es el valor inicial #}
+    {% if columna == 'entregado' %}
+    {% set fe = pedido.fecha_entregado or f %}
+    <div class="pc-fecha" title="Fecha y hora en que se entregó">
+      <i class="bi bi-calendar-check"></i><span class="pc-fecha-txt">{{ fe.strftime('%d/%m') }} {{ fe.strftime('%I')|int }}{{ (':' ~ fe.strftime('%M')) if fe.strftime('%M') != '00' else '' }}{{ fe.strftime('%p')|lower }}</span>
+    </div>
+    {% else %}
+    <div class="pc-fecha" title="Fecha y hora de entrega">
+      <i class="bi bi-calendar-event"></i><span class="pc-fecha-txt">{{ f.strftime('%d/%m') }} {{ f.strftime('%I')|int }}{{ (':' ~ minutos) if minutos != '00' else '' }}{{ f.strftime('%p')|lower }}</span>
+    </div>
+    {% endif %}
+    <div class="resp-group pc-resp">
+      {% for r in pedido.responsables_asignados %}
+        {% set foto_resp = perfiles_foto.get(r.id_usuario) if perfiles_foto is defined else none %}
+        {% if foto_resp %}
+        <img class="avatar-resp-pill" src="{{ url_for('static', filename='uploads/perfiles/' ~ foto_resp) }}"
+             alt="Foto de {{ r.nombre }}" title="{{ r.nombre }}">
+        {% else %}
+        <span class="avatar-resp-pill" title="{{ r.nombre }}" aria-label="{{ r.nombre }}">{{ r.nombre[:1]|upper }}</span>
+        {% endif %}
+      {% else %}
+        <span class="avatar-resp-pill" style="background:#adb5bd;" title="Sin responsable">N/A</span>
+      {% endfor %}
+    </div>
+  </div>
+
+  <button type="button" class="btn-expandir" data-bs-toggle="collapse" data-bs-target="#{{ tid }}"
+          aria-expanded="false" aria-controls="{{ tid }}" title="Ver más">
+    <i class="bi bi-chevron-down"></i>
+  </button>
+
+  <!-- ===== Vista ampliada ===== -->
+  <div class="collapse card-extra" id="{{ tid }}">
+    <div class="extra-body">
+
+      <div class="extra-bloque">
+        {{ info_produccion(pedido, compacto=True, solo_lectura=solo_lectura) }}
+      </div>
+
+      {% if ver_comercial %}
+      <div class="extra-bloque">
+        <div class="resumen-finanzas">
+          <div><div class="rf-label">Total</div><div class="rf-monto">${{ '%.2f'|format(pedido.total_float) }}</div></div>
+          <div><div class="rf-label">Pagado</div><div class="rf-monto">${{ '%.2f'|format(pedido.total_pagado) }}</div></div>
+          <div><div class="rf-label">Saldo</div>
+            <div class="rf-monto{% if pedido.saldo_restante > 0 %} rf-pendiente{% endif %}">${{ '%.2f'|format(pedido.saldo_restante) }}</div></div>
+        </div>
+        {% if pedido.requiere_factura %}<div class="rf-factura"><i class="bi bi-receipt me-1"></i>Requiere factura</div>{% endif %}
+      </div>
+      {% endif %}
+
+      {% if btn_cobrar %}
+      <div class="pedido-pago-panel mt-3" id="panel-pago-{{ pedido.id_pedido }}"
+           data-pago-panel data-saldo="{{ '%.2f'|format(pedido.saldo_restante) }}" hidden>
+        <div class="pedido-pago-metodos" role="group" aria-label="Método de pago">
+          <input type="hidden" data-pago-metodo value="Efectivo">
+          <button type="button" class="pedido-pago-metodo active" data-pago-control
+                  data-pago-metodo-opcion="Efectivo" aria-pressed="true">Efectivo</button>
+          <button type="button" class="pedido-pago-metodo" data-pago-control
+                  data-pago-metodo-opcion="Tarjeta" aria-pressed="false"
+                  {% if pedido.requiere_factura %}disabled title="No disponible con factura"{% endif %}>Tarjeta</button>
+          <button type="button" class="pedido-pago-metodo" data-pago-control
+                  data-pago-metodo-opcion="Transferencia" aria-pressed="false">Transferencia</button>
+        </div>
+        <div class="pedido-pago-cantidad-fila">
+          <div class="pedido-pago-cantidad">
+            <span aria-hidden="true">$</span>
+            <input type="text" inputmode="decimal" class="pedido-pago-monto"
+                   id="monto-pago-{{ pedido.id_pedido }}" placeholder="0.00" autocomplete="off"
+                   data-pago-monto aria-label="Cantidad a cobrar">
+          </div>
+          <button type="button" class="pedido-pago-liquidar" data-pago-control
+                  data-pago-liquidar>Liquidó</button>
+        </div>
+        <div class="pedido-pago-resumen" data-pago-resumen aria-live="polite">
+          Este pago <strong>$0.00</strong> · Resta
+          <strong class="pedido-pago-resta">${{ '%.2f'|format(pedido.saldo_restante) }}</strong>
+        </div>
+        <div class="alert alert-danger py-2 mb-0" data-pago-error role="alert" hidden></div>
+        <div class="pedido-pago-acciones">
+          <button type="button" class="pedido-pago-cancelar" data-pago-control
+                  data-pago-cancelar>Cancelar</button>
+          <button type="button" class="pedido-pago-guardar" data-pago-control
+                  disabled
+                  data-pago-guardar>Guardar cobro</button>
+        </div>
+      </div>
+      {% endif %}
+
+{% if btn_cobrar or btn_editar or btn_terminar or btn_entregar or btn_imprimir or btn_etiqueta %}
+<div class="extra-acciones">
+
+  {% if btn_cobrar or btn_imprimir or btn_etiqueta or btn_editar %}
+  <!-- Acciones secundarias: el grid reparte el ancho entre los botones visibles -->
+  <div class="acciones-secundarias">
+    {% if btn_cobrar %}
+      <button type="button"
+              class="acc-sec acc-sec-cobrar"
+              title="Registrar pago"
+              aria-expanded="false"
+              aria-controls="panel-pago-{{ pedido.id_pedido }}"
+              data-pago-control
+              data-pago-abrir>
+        <i class="bi bi-cash"></i>
+        <span>Cobrar</span>
+      </button>
+    {% endif %}
+
+    {% if btn_imprimir %}
+      <button type="button"
+              class="acc-sec"
+              title="Imprimir ticket"
+              data-ticket-url="{{ url_for('pedidos.ticket_pedido', id_pedido=pedido.id_pedido) }}"
+              onclick="imprimirTicket(this.dataset.ticketUrl)">
+        <i class="bi bi-printer"></i>
+        <span>Ticket</span>
+      </button>
+
+      <a class="acc-sec"
+         title="Descargar nota en PDF"
+         href="{{ url_for('pedidos.descargar_ticket_pdf', id_pedido=pedido.id_pedido) }}">
+        <i class="bi bi-file-earmark-pdf"></i>
+        <span>PDF</span>
+      </a>
+    {% endif %}
+
+    {% if btn_etiqueta %}
+      <button type="button"
+              class="acc-sec"
+              title="Imprimir etiqueta"
+              data-url="{{ url_for('pedidos.imprimir_etiqueta', id_pedido=pedido.id_pedido) }}"
+              data-folio="{{ pedido.folio }}"
+              onclick="imprimirEtiquetaCard(this)">
+        <i class="bi bi-tag"></i>
+        <span>Etiqueta</span>
+      </button>
+    {% endif %}
+
+    {% if btn_editar %}
+      <button type="button"
+              class="acc-sec"
+              title="Editar pedido"
+              data-editar-url="{{ url_for('pedidos.formulario_editar', id_pedido=pedido.id_pedido) }}">
+        <i class="bi bi-pencil-square"></i>
+        <span>Editar</span>
+      </button>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <!-- Acción principal: cambio de estado -->
+  {% if btn_terminar or btn_entregar %}
+    <div class="acc-principal">
+      {% if btn_terminar %}
+        {% if pedido.tiene_asignaciones_por_producto %}
+          <a href="{{ url_for('pedidos.ficha', folio=pedido.folio) }}" class="acc-principal-btn">
+            <i class="bi bi-list-check"></i> Revisar productos
+          </a>
+        {% else %}
+        {{ boton_terminar(pedido) }}
+        {% endif %}
+      {% endif %}
+
+      {% if btn_entregar %}
+        {% if pedido.estado_pago == 'Pagado' %}
+          <form action="{{ url_for('dashboard.cambiar_estado', pedido_id=pedido.id_pedido) }}" method="POST">
+            <input type="hidden" name="nuevo_estado" value="Entregado">
+            <button type="submit" class="acc-principal-btn">
+              ✓ Entregar
+            </button>
+          </form>
+        {% else %}
+          <button type="button"
+                  class="acc-principal-btn"
+                  disabled
+                  title="Requiere estar liquidado para entregar">
+            🔒 Saldo pendiente
+          </button>
+        {% endif %}
+      {% endif %}
+    </div>
+  {% endif %}
+
+</div>
+{% endif %}
+
+
+    </div>
+  </div>
+</div>

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Iniciar sesión · PrintFlow Manager</title>
+  <link href="{{ url_for('static', filename='vendor/fonts/fonts.css') }}" rel="stylesheet">
+  <style>
+    :root { --pf-blue: #386df5; --pf-navy: #1b2a5c; }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: linear-gradient(180deg, #d8fffa 0%, #a9d4f7 35%, #6a9ff4 70%, #3d70f6 100%);
+      background-attachment: fixed;
+      color: #1a1a1a;
+      overflow-x: hidden;
+    }
+    .pf-wave { position: fixed; left: 0; bottom: 0; width: 100%; height: 27vh; z-index: 0; pointer-events: none; }
+    .pf-page {
+      position: relative; z-index: 1; min-height: 100%;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 2rem 1rem;
+    }
+    .pf-brand { text-align: center; color: #fff; margin-bottom: 4.5rem; }
+    .pf-brand h1 {
+      font-family: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+      font-weight: 700; font-size: clamp(2.4rem, 6vw, 3.6rem); letter-spacing: -1px; margin: 0; line-height: 1;
+    }
+    .pf-brand span {
+      display: block; font-family: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+      font-weight: 400; font-size: clamp(1rem, 2.4vw, 1.45rem); letter-spacing: .72em; margin-top: .3rem; padding-left: .72em;
+    }
+    .pf-card {
+      width: 100%; max-width: 396px; background: #fff; border: 1px solid #e3e6ee; border-radius: 8px;
+      padding: 1.25rem 1.3rem 1.4rem; box-shadow: 0 6px 24px rgba(20, 50, 120, .12);
+    }
+    .pf-card label { display: block; font-size: .85rem; font-weight: 500; margin-bottom: .45rem; }
+    .pf-card input {
+      width: 100%; height: 38px; border: 1px solid #dcdfe6; border-radius: 8px; padding: 0 .75rem;
+      font: inherit; font-size: .9rem; color: #1a1a1a; background: #fff; outline: none;
+    }
+    .pf-card input::placeholder { color: #b4b8c2; }
+    .pf-card input:focus { border-color: var(--pf-blue); box-shadow: 0 0 0 3px rgba(56, 109, 245, .18); }
+    .pf-field { margin-bottom: 1.5rem; }
+    .pf-card .form-check { display: flex; align-items: center; gap: .5rem; margin: -.6rem 0 1.2rem; }
+    .pf-card .form-check-input {
+      width: 16px; height: 16px; margin: 0; padding: 0; border-radius: 4px;
+      accent-color: var(--pf-blue); cursor: pointer; flex-shrink: 0;
+    }
+    .pf-card .form-check-label { margin: 0; font-size: .85rem; font-weight: 400; cursor: pointer; }
+    .pf-btn {
+      width: 100%; height: 38px; margin-top: .4rem; background: var(--pf-blue); color: #fff;
+      border: 1px solid var(--pf-navy); border-radius: 8px; font: inherit; font-size: .9rem; cursor: pointer;
+    }
+    .pf-btn:hover { filter: brightness(.95); }
+    .pf-help { margin-top: 1.6rem; font-size: .85rem; }
+    .pf-help summary { cursor: pointer; text-decoration: underline; list-style: none; width: fit-content; }
+    .pf-help summary::-webkit-details-marker { display: none; }
+    .pf-help p { margin: .6rem 0 0; color: #555; line-height: 1.4; }
+    .pf-alert { border-radius: 8px; padding: .55rem .8rem; font-size: .85rem; margin-bottom: 1rem; }
+    .pf-alert.danger { background: #fdecec; color: #a12626; }
+    .pf-alert.warning { background: #fff6e0; color: #7a5a00; }
+    .pf-alert.success { background: #e8f6ec; color: #1f6b3a; }
+  </style>
+</head>
+<body>
+  <svg class="pf-wave" viewBox="0 0 1288 250" preserveAspectRatio="none" aria-hidden="true">
+    <path fill="#386df5" d="M0,120 C60,80 140,55 230,55 C420,55 520,138 690,138 C840,138 920,2 1060,2 C1160,2 1230,35 1288,70 L1288,250 L0,250 Z"/>
+  </svg>
+
+  <main class="pf-page">
+    <div class="pf-brand">
+      <h1>PrintFlow</h1>
+      <span>MANAGER</span>
+    </div>
+
+    <div class="pf-card">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+          <div class="pf-alert {{ category }}" role="alert">{{ message }}</div>
+        {% endfor %}
+      {% endwith %}
+
+      <form method="POST" action="{{ url_for('autenticacion.login', next=request.args.get('next')) }}">
+        <div class="pf-field">
+          <label for="correo">Correo</label>
+          <input id="correo" type="email" name="correo" placeholder="correo@ejemplo.com" autocomplete="username" required autofocus>
+        </div>
+        <div class="pf-field">
+          <label for="password">Contraseña</label>
+          <input id="password" type="password" name="password" placeholder="Contraseña" autocomplete="current-password" required>
+        </div>
+        <div class="form-check">
+          <input type="checkbox" class="form-check-input" name="recordarme" id="recordarme">
+          <label class="form-check-label" for="recordarme">Recuérdame en este dispositivo</label>
+        </div>
+        <button type="submit" class="pf-btn">Iniciar sesión</button>
+      </form>
+
+      <details class="pf-help">
+        <summary>¿Olvidaste tu contraseña?</summary>
+        <p>Pide a un administrador que la restablezca desde la sección Usuarios.</p>
+      </details>
+    </div>
+  </main>
+</body>
+</html>

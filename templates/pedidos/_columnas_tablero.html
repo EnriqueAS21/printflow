@@ -1,0 +1,133 @@
+{% macro tablero_columnas(columnas, modo) %}
+  {% set ns = namespace(hay=false, cols=[]) %}
+  {% for col in columnas %}
+    {% if col.pedidos %}{% set ns.hay = true %}{% endif %}
+  {% endfor %}
+  {% for col in columnas %}
+    {% set ns.cols = ns.cols + ['minmax(284px, 1fr)' if (col.pedidos or not ns.hay) else 'minmax(0, 0fr)'] %}
+  {% endfor %}
+
+  <div class="kanban-tabs" role="tablist">
+    {% for col in columnas %}
+    {% set titulo_corto = col.titulo_corto or {'en-proceso': 'En proceso', 'terminado': 'Terminado', 'entregado': 'Entregado', 'vencidos': 'Vencidos', 'hoy': 'Hoy', 'proximos': 'Próximos', 'terminados-hoy': 'Listos'}[col.clave] %}
+    {% set icono = col.icono or {'en-proceso': 'bi-arrow-repeat', 'terminado': 'bi-clipboard-check', 'entregado': 'bi-box-seam', 'vencidos': 'bi-exclamation-triangle', 'hoy': 'bi-calendar-event', 'proximos': 'bi-calendar-week', 'terminados-hoy': 'bi-clipboard-check'}[col.clave] %}
+    <button type="button" class="kanban-tab kanban-tab-{{ col.clave }}" data-tab="{{ col.clave }}" role="tab"
+            aria-selected="{{ 'true' if loop.first else 'false' }}">
+      <span>
+        <span class="tab-largo">{{ col.titulo }}</span>
+        <span class="tab-corto">{{ titulo_corto }}</span>
+      </span>
+      <span class="kanban-tab-conteo">{{ col.pedidos|length if col.pedidos is not string else col.pedidos }}</span>
+    </button>
+    {% endfor %}
+  </div>
+
+  <div class="row g-4 kanban-board{% if modo == 'produccion' %} kanban-produccion{% endif %}"
+       style="--cols: {{ ns.cols|join(' ') }}">
+    {% for col in columnas %}
+    {% set icono = col.icono or {'en-proceso': 'bi-arrow-repeat', 'terminado': 'bi-clipboard-check', 'entregado': 'bi-box-seam', 'vencidos': 'bi-exclamation-triangle', 'hoy': 'bi-calendar-event', 'proximos': 'bi-calendar-week', 'terminados-hoy': 'bi-clipboard-check'}[col.clave] %}
+    <div class="columna-kanban{% if modo == 'produccion' %} col-md-3{% else %} col-md-4{% endif %}{% if loop.first %} tab-activa{% endif %}{% if ns.hay and not col.pedidos %} columna-oculta{% endif %}"
+         data-col="{{ col.clave }}">
+      <div class="kanban-col">
+        <div class="col-header">
+          <div class="col-title-group">
+            <div class="status-icon-circle columna-color columna-color-{{ col.clave }}">
+              <i class="bi {{ icono }}"></i>
+            </div>
+            <h2 class="col-title">{{ col.titulo }}</h2>
+            <span class="col-badge" data-badge="{{ col.clave }}" aria-label="Tarjetas visibles">{{ col.pedidos|length if col.pedidos is not string else col.pedidos }}</span>
+          </div>
+          {% if caller is defined %}{{ caller(col) }}{% else %}
+          <div class="dropdown">
+            <button class="btn-filter-pill dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Filtrar">
+              <i class="bi bi-sliders filtro-icono"></i><span class="filtro-texto">Filtrar</span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end p-3 shadow-sm border-0" style="min-width: 220px;">
+              {% if puede('caja.ver') %}
+              <label class="form-label small fw-bold text-muted mb-1">Pago:</label>
+              <select class="form-select form-select-sm mb-2 filtro-pago">
+                <option value="todos">Todos los pagos</option>
+                <option value="pagado">Pagado</option>
+                <option value="anticipo">Anticipo</option>
+                <option value="sin pagar">Sin pagar</option>
+              </select>
+              {% endif %}
+              <label class="form-label small fw-bold text-muted mb-1">Fecha entrega:</label>
+              <select class="form-select form-select-sm mb-2 filtro-fecha">
+                <option value="todos">Cualquier fecha</option>
+                <option value="hoy">Entrega Hoy</option>
+              </select>
+              <label class="form-label small fw-bold text-muted mb-1">Responsable:</label>
+              <select class="form-select form-select-sm filtro-responsable">
+                <option value="todos">Todos</option>
+                <option value="sin asignar">Sin asignar</option>
+                {% for op in operadores %}
+                  <option value="{{ op.nombre | lower }}">{{ op.nombre }}</option>
+                {% endfor %}
+              </select>
+              <label class="form-label small fw-bold text-muted mb-1 mt-2">Ordenar por:</label>
+              <select class="form-select form-select-sm orden-columna" data-col="{{ col.clave }}">
+                {% if col.clave == 'terminado' or col.clave == 'terminados-hoy' %}
+                <option value="{{ 'terminado-reciente' if col.clave == 'terminados-hoy' else 'espera' }}">Más {{ 'reciente' if col.clave == 'terminados-hoy' else 'días esperando' }}</option>
+                {% elif col.clave == 'entregado' %}
+                <option value="reciente">Más reciente</option>
+                {% else %}
+                <option value="entrega">Entrega más próxima</option>
+                {% endif %}
+                <option value="folio">Folio</option>
+              </select>
+            </div>
+          </div>
+          {% endif %}
+        </div>
+
+        <div class="tablero-barra-filtro">
+          <div class="dropdown">
+            <button class="tablero-filtro-icono dropdown-toggle" type="button" data-bs-toggle="dropdown"
+                    aria-expanded="false" title="Filtrar" aria-label="Filtrar">
+              <i class="bi bi-sliders"></i>
+            </button>
+            <div class="dropdown-menu dropdown-menu-end p-3 shadow-sm border-0" style="min-width: 220px;">
+              {% if puede('caja.ver') %}
+              <label class="form-label small fw-bold text-muted mb-1">Pago:</label>
+              <select class="form-select form-select-sm mb-2 filtro-pago">
+                <option value="todos">Todos los pagos</option>
+                <option value="pagado">Pagado</option>
+                <option value="anticipo">Anticipo</option>
+                <option value="sin pagar">Sin pagar</option>
+              </select>
+              {% endif %}
+              <label class="form-label small fw-bold text-muted mb-1">Fecha entrega:</label>
+              <select class="form-select form-select-sm mb-2 filtro-fecha">
+                <option value="todos">Cualquier fecha</option>
+                <option value="hoy">Entrega Hoy</option>
+              </select>
+              <label class="form-label small fw-bold text-muted mb-1">Responsable:</label>
+              <select class="form-select form-select-sm filtro-responsable">
+                <option value="todos">Todos</option>
+                <option value="sin asignar">Sin asignar</option>
+                {% for op in operadores %}
+                  <option value="{{ op.nombre | lower }}">{{ op.nombre }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="contenedor-tarjetas"{% if col.clave == 'entregado' %} data-total="{{ total_entregados }}" data-hay-mas="{{ 1 if hay_mas_entregados else 0 }}"{% endif %}>
+          <p class="text-center text-muted small my-4 mensaje-columna-vacia"{% if col.pedidos %} hidden{% endif %}>{{ col.vacio or 'No hay pedidos.' }}</p>
+          {% for pedido in col.pedidos %}
+            {% with columna = col.plantilla %}{% include 'pedidos/_tarjeta_pedido.html' %}{% endwith %}
+          {% endfor %}
+          {% if col.clave == 'entregado' %}
+          <div class="entregados-mas" id="entregadosMas" aria-live="polite">
+            <span class="entregados-mas-estado"></span>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="entregadosMasBoton" hidden>Cargar más</button>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+{% endmacro %}

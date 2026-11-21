@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+{% block title %}Área Creativa - Bitácora{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 1150px;">
+  <div class="bg-white rounded-4 shadow-sm p-4">
+    <h4 class="fw-bold mb-3">Bitácora de actividad</h4>
+
+    <form method="GET" class="row g-2 mb-3">
+      <div class="col-md-3">
+        <select name="usuario" class="form-select form-select-sm">
+          <option value="">Todos los usuarios</option>
+          {% for u in usuarios %}<option value="{{ u.id_usuario }}" {% if filtros.get('usuario') == u.id_usuario %}selected{% endif %}>{{ u.nombre }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <select name="accion" class="form-select form-select-sm">
+          <option value="">Todas las acciones</option>
+          {% for a in acciones %}<option value="{{ a }}" {% if filtros.get('accion') == a %}selected{% endif %}>{{ a }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2"><input type="date" name="desde" class="form-control form-control-sm" value="{{ filtros.get('desde', '') }}"></div>
+      <div class="col-md-2"><input type="date" name="hasta" class="form-control form-control-sm" value="{{ filtros.get('hasta', '') }}"></div>
+      <div class="col-md-2 d-flex gap-2">
+        <button class="btn btn-sm btn-primary rounded-pill flex-fill" type="submit">Filtrar</button>
+        <a href="{{ url_for('bitacora.index') }}" class="btn btn-sm btn-outline-secondary rounded-pill">Limpiar</a>
+      </div>
+    </form>
+
+    <div class="table-responsive">
+      <table class="table table-sm align-middle">
+        <thead class="table-light">
+          <tr><th>Fecha</th><th>Usuario</th><th>Rol</th><th>Acción</th><th>Detalle</th><th>IP</th></tr>
+        </thead>
+        <tbody>
+          {% for b in paginacion.items %}
+          <tr class="{% if b.accion in ('ACCESO_DENEGADO', 'LOGIN_FALLIDO') %}table-warning{% endif %}">
+            <td class="text-nowrap">{{ b.fecha.strftime('%d/%m/%Y %H:%M:%S') }}</td>
+            <td>{{ b.nombre_usuario or '—' }}</td>
+            <td>{{ b.rol or '—' }}</td>
+            <td><span class="badge bg-secondary">{{ b.accion }}</span></td>
+            <td class="small">{{ b.detalle or '' }}</td>
+            <td class="small text-muted">{{ b.ip or '' }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6" class="text-center text-muted py-4">Sin registros.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if paginacion.pages > 1 %}
+    <div class="d-flex justify-content-between align-items-center">
+      <span class="small text-muted">Página {{ paginacion.page }} de {{ paginacion.pages }} · {{ paginacion.total }} registros</span>
+      <div class="btn-group">
+        {% if paginacion.has_prev %}<a class="btn btn-sm btn-outline-primary" href="{{ url_for('bitacora.index', pagina=paginacion.prev_num, **filtros) }}">← Anterior</a>{% endif %}
+        {% if paginacion.has_next %}<a class="btn btn-sm btn-outline-primary" href="{{ url_for('bitacora.index', pagina=paginacion.next_num, **filtros) }}">Siguiente →</a>{% endif %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

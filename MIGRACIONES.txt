@@ -1,0 +1,9 @@
+scripts/migrar_clientes.py
+scripts/migrar_productos.py
+scripts/migrar_iva_comision.py
+scripts/migrar_factura.py
+scripts/migrar_cuenta_fiscal.py
+scripts/migrar_apartados.py
+scripts/migrar_indices_rendimiento.py
+scripts/migrar_fecha_entregado.py
+scripts/normalizar_datos.py

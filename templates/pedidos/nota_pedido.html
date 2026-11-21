@@ -1,0 +1,140 @@
+{% extends '_nota_base.html' %}
+
+{% block title %}Nota de pedido · {{ pedido.folio }}{% endblock %}
+{% block document_title %}Nota de pedido{% endblock %}
+{% block document_date %}Emitida: {{ emision.strftime('%d/%m/%Y %I:%M %p')|lower }}{% endblock %}
+
+{% block extra_styles %}
+<style>
+    .nota-pedido-seccion { margin-top: 20px; }
+    .nota-pedido-seccion h3 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; color: #0b2a6f; }
+    .resumen-montos { width: min(100%, 360px); margin: 12px 0 0 auto; }
+    .resumen-montos td { padding: 5px 6px; border-bottom: 0; }
+    .resumen-montos .num { text-align: right; white-space: nowrap; }
+    .dato-factura { margin: 4px 0; }
+    .dato-vacio { display: inline-block; min-width: 180px; height: 1em; border-bottom: 1px dotted #555; }
+    @media print { .nota-pedido-seccion { break-inside: avoid; page-break-inside: avoid; } }
+</style>
+{% endblock %}
+
+{% block buttons %}
+{% if not vista_previa %}
+<div class="acciones">
+    <button type="button" class="btn-cerrar" onclick="cerrarNota()">Cerrar</button>
+    <button type="button" class="btn-imprimir" onclick="window.print()">Imprimir</button>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<section class="cliente">
+    <div><span>Folio:</span> <strong>{{ pedido.folio }}</strong></div>
+    <div><span>Fecha:</span> <strong>{{ pedido.fecha_creacion.strftime('%d/%m/%Y') if pedido.fecha_creacion else '—' }}</strong></div>
+    <div><span>Entrega:</span> <strong class="{% if not pedido.fecha_entrega %}dato-vacio{% endif %}">{{ pedido.fecha_entrega.strftime('%d/%m/%Y %I:%M %p')|lower if pedido.fecha_entrega else '&nbsp;'|safe }}</strong></div>
+    <div><span>Cliente:</span> <strong class="{% if not (pedido.nombre_cliente|trim) %}dato-vacio{% endif %}">{{ pedido.nombre_cliente|trim if pedido.nombre_cliente|trim else '&nbsp;'|safe }}</strong></div>
+    <div><span>Teléfono:</span> <strong class="{% if not (pedido.telefono_cliente|trim) %}dato-vacio{% endif %}">{{ pedido.telefono_cliente|trim if pedido.telefono_cliente|trim else '&nbsp;'|safe }}</strong></div>
+</section>
+
+<section class="nota-pedido-seccion">
+    <h3>Productos</h3>
+    <table>
+        <thead>
+            <tr>
+                <th class="num">Cantidad</th>
+                <th>Descripción</th>
+                <th class="num">Precio</th>
+                <th class="num">Subtotal</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for detalle in pedido.detalles %}
+            <tr>
+                <td class="num">{{ '%g'|format(detalle.cantidad|float) }}</td>
+                <td>{{ detalle.descripcion }}</td>
+                <td class="num">${{ '{:,.2f}'.format(detalle.precio_unitario|float) }}</td>
+                <td class="num">${{ '{:,.2f}'.format(detalle.subtotal|float) }}</td>
+            </tr>
+            {% else %}
+            <tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+            <tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+            <tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <table class="resumen-montos">
+        <tbody>
+            <tr><td>Subtotal</td><td class="num">${{ '{:,.2f}'.format(pedido.subtotal|default(0)|float) }}</td></tr>
+            {% if pedido.iva|float > 0 %}
+            <tr><td>IVA 16%</td><td class="num">${{ '{:,.2f}'.format(pedido.iva|float) }}</td></tr>
+            {% endif %}
+            <tr><td><strong>Total</strong></td><td class="num"><strong>${{ '{:,.2f}'.format(pedido.total_float|default(0)|float) }}</strong></td></tr>
+        </tbody>
+    </table>
+</section>
+
+{% if pedido.pagos %}
+<section class="nota-pedido-seccion">
+    <h3>Pagos</h3>
+    {% set pagos_con_comision = pedido.pagos|selectattr('comision')|list %}
+    <table>
+        <thead>
+            <tr>
+                <th>Método</th>
+                <th class="num">Monto</th>
+                {% if pagos_con_comision %}<th class="num">Comisión</th>{% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for pago in pedido.pagos %}
+            <tr>
+                <td>{{ pago.metodo_pago }}</td>
+                <td class="num">${{ '{:,.2f}'.format(pago.monto|float) }}</td>
+                {% if pagos_con_comision %}<td class="num">{% if pago.comision|float > 0 %}${{ '{:,.2f}'.format(pago.comision|float) }}{% else %}—{% endif %}</td>{% endif %}
+            </tr>
+            {% else %}
+            <tr><td colspan="{{ 3 if pagos_con_comision else 2 }}" class="vacio">Sin pagos registrados.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <table class="resumen-montos">
+        <tbody>
+            <tr><td>Resta</td><td class="num"><strong>${{ '{:,.2f}'.format(pedido.saldo_restante) }}</strong></td></tr>
+        </tbody>
+    </table>
+</section>
+{% endif %}
+
+{% if pedido.factura and (pedido.factura.rfc|trim or pedido.factura.razon_social|trim or pedido.factura.regimen_fiscal|trim or pedido.factura.cp_fiscal|trim or pedido.factura.uso_cfdi|trim or pedido.factura.correo|trim) %}
+<section class="nota-pedido-seccion">
+    <h3>Datos de facturación</h3>
+    <div class="cliente">
+        <div class="dato-factura"><span>RFC:</span> <strong>{{ pedido.factura.rfc }}</strong></div>
+        <div class="dato-factura"><span>Razón social:</span> <strong>{{ pedido.factura.razon_social }}</strong></div>
+        <div class="dato-factura"><span>Régimen fiscal:</span> <strong>{{ pedido.factura.regimen_fiscal }}</strong></div>
+        <div class="dato-factura"><span>CP fiscal:</span> <strong>{{ pedido.factura.cp_fiscal }}</strong></div>
+        <div class="dato-factura"><span>Uso de CFDI:</span> <strong>{{ pedido.factura.uso_cfdi }}</strong></div>
+        {% if pedido.factura.correo %}<div class="dato-factura"><span>Correo:</span> <strong>{{ pedido.factura.correo }}</strong></div>{% endif %}
+    </div>
+    {% if configuracion.cuenta_fiscal_banco or configuracion.cuenta_fiscal_titular or configuracion.cuenta_fiscal_clabe %}
+    <p><strong>Transferencias:</strong>
+        {% if configuracion.cuenta_fiscal_banco %}{{ configuracion.cuenta_fiscal_banco }}{% endif %}
+        {% if configuracion.cuenta_fiscal_banco and configuracion.cuenta_fiscal_titular %} · {% endif %}
+        {% if configuracion.cuenta_fiscal_titular %}{{ configuracion.cuenta_fiscal_titular }}{% endif %}
+        {% if (configuracion.cuenta_fiscal_banco or configuracion.cuenta_fiscal_titular) and configuracion.cuenta_fiscal_clabe %} · {% endif %}
+        {% if configuracion.cuenta_fiscal_clabe %}{{ configuracion.cuenta_fiscal_clabe }}{% endif %}
+    </p>
+    {% endif %}
+</section>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if not vista_previa %}
+<script>
+function cerrarNota() {
+    window.close();
+    setTimeout(() => { if (!window.closed) history.back(); }, 150);
+}
+</script>
+{% endif %}
+{% endblock %}

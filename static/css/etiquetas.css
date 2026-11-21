@@ -1,0 +1,20 @@
+/* Avisos de etiqueta */
+.aviso-etiqueta {
+  display: flex; align-items: center; gap: .75rem;
+  max-width: 360px; pointer-events: auto;
+  border-radius: 999px; padding: 12px 22px;
+  border: 1px solid rgba(255,255,255,.35);
+  box-shadow: 0 8px 24px rgba(0,0,0,.18);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  color: #fff;
+  opacity: 0; transform: translateY(-8px);
+  transition: opacity .2s ease, transform .2s ease;
+}
+.aviso-etiqueta.visible { opacity: 1; transform: translateY(0); }
+.aviso-etiqueta__texto { flex: 1; }
+.aviso-etiqueta--azul     { background: rgba(13,110,253,.70); }
+.aviso-etiqueta--amarillo { background: rgba(255,193,7,.70); color: #212529; }
+.aviso-etiqueta--verde    { background: rgba(25,135,84,.70); }
+.aviso-etiqueta--gris     { background: rgba(108,117,125,.70); }
+.aviso-etiqueta--rojo     { background: rgba(220,53,69,.70); }

@@ -1,0 +1,97 @@
+{% extends '_nota_base.html' %}
+
+{% block title %}Pedidos activos · {{ cliente.clave }} {{ cliente.nombre }}{% endblock %}
+{% block document_title %}Pedidos activos{% endblock %}
+{% block document_date %}Emitida: {{ emision.strftime('%d/%m/%Y %I:%M %p')|lower }}{% endblock %}
+
+{% block buttons %}
+<div class="acciones">
+    <button type="button" class="btn-cerrar" onclick="cerrar()">Cerrar</button>
+    <button type="button" class="btn-imprimir" onclick="window.print()">Imprimir</button>
+</div>
+{% endblock %}
+
+{% block content %}
+<section class="cliente">
+    <div><span>Clave:</span> <strong>{{ cliente.clave }}</strong></div>
+    <div><span>Cliente:</span> <strong>{{ cliente.nombre }}</strong></div>
+    <div><span>Teléfono:</span> <strong>{{ cliente.telefono }}</strong></div>
+</section>
+
+{% if pedidos %}
+<table>
+    <thead>
+        <tr>
+            <th>Folio</th>
+            <th>Entrega</th>
+            <th>Estatus</th>
+            <th>Productos</th>
+            <th class="num">Total</th>
+            <th class="num">Pagado</th>
+            <th class="num">Saldo</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for p in pedidos %}
+        <tr>
+            <td class="folio">{{ p.folio }}</td>
+            <td style="white-space: nowrap;">{{ p.fecha_entrega.strftime('%d/%m/%Y') if p.fecha_entrega else '—' }}</td>
+            <td>
+                <span class="estatus {{ 'estatus-terminado' if p.estatus == 'Terminado' else 'estatus-proceso' }}">{{ p.estatus }}</span>
+            </td>
+            <td>
+                {% if p.detalles %}
+                <ul class="productos">
+                    {% for d in p.detalles %}
+                    <li>{{ '%g'|format(d.cantidad|float) }} × {{ d.descripcion }}</li>
+                    {% endfor %}
+                </ul>
+                {% else %}{{ p.resumen_descripcion }}{% endif %}
+            </td>
+            <td class="num">${{ '{:,.2f}'.format(p.total_float) }}</td>
+            <td class="num">${{ '{:,.2f}'.format(p.total_pagado) }}</td>
+            <td class="num"><strong>${{ '{:,.2f}'.format(p.saldo_restante) }}</strong></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<section class="totales">
+    <div class="total-caja"><span>Total</span><strong>${{ '{:,.2f}'.format(totales.total) }}</strong></div>
+    <div class="total-caja"><span>Pagado</span><strong>${{ '{:,.2f}'.format(totales.pagado) }}</strong></div>
+    <div class="total-caja saldo"><span>Saldo por liquidar</span><strong>${{ '{:,.2f}'.format(totales.saldo) }}</strong></div>
+</section>
+{% else %}
+<p class="vacio">El cliente no tiene pedidos en proceso ni terminados pendientes de entrega.</p>
+{% endif %}
+
+{% if apartados %}
+<section class="apartados">
+    {% for apartado in apartados %}
+    <div class="apartado">
+        <h3>{{ apartado.titulo|upper }}</h3>
+        {% if apartado.bloques %}
+        <div class="apartado-bloques">
+            {% for bloque in apartado.bloques %}
+            <div class="apartado-bloque">
+                {% if bloque.subtitulo %}<strong>{{ bloque.subtitulo }}</strong>{% endif %}
+                {% if bloque.texto %}<p>{{ bloque.texto }}</p>{% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+</section>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function cerrar() {
+    window.close();
+    // Si la pestaña no la abrió un script, el navegador ignora close(): regresar.
+    setTimeout(() => { if (!window.closed) history.length > 1 ? history.back() : location.href = {{ url_for('clientes.ficha', id_cliente=cliente.id_cliente)|tojson }}; }, 150);
+}
+</script>
+{% endblock %}

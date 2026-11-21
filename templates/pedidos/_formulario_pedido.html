@@ -1,0 +1,627 @@
+{# Formulario compartido: alta (caja / nuevo_pedido) y edición (dashboard). #}
+{% set es_edicion = (pedido is defined) and pedido %}
+{% set puede_cancelar = es_edicion and puede('pedidos.cancelar') and pedido.estatus in ('En proceso', 'Terminado') %}
+{% set uid = pedido.id_pedido if es_edicion else 'nuevo' %}
+{% set entrega = pedido.fecha_entrega if es_edicion else none %}
+{% set es_pm = entrega and entrega.hour >= 12 %}
+{% set lista_responsables = usuarios_produccion if usuarios_produccion is defined else (operadores if operadores is defined else []) %}
+{# La edición bajo demanda se sirve desde /pedidos, pero pertenece al tablero. #}
+{% set origen_form = origen_formulario if origen_formulario is defined else request.blueprint %}
+
+<div class="container-fluid mt-4 mb-5 pf-form" style="width: 100%; max-width: 1600px;"
+     data-tasa-iva="{{ TASA_IVA }}"
+     data-tasa-comision="{{ TASA_COMISION_TARJETA }}"
+     data-responsable-ids='{{ lista_responsables|map(attribute="id_usuario")|list|tojson }}'
+     data-responsable-nombres='{{ lista_responsables|map(attribute="nombre")|list|tojson }}'
+     {% if puede('productos.usar') %}data-puede-usar-productos="1"
+     data-url-buscador-productos="{{ url_for('static', filename='productos/buscador_productos.js') }}"{% endif %}
+     {% if puede('clientes.ver') %}data-url-buscar-clientes="{{ url_for('clientes.buscar') }}"
+     data-url-fiscal-clientes="{{ url_for('clientes.fiscal', id_cliente=0) }}"{% endif %}>
+    <!-- Barra: fecha, hora y folio (ancho completo, sobre formulario y vista previa) -->
+    <div class="pf-barra px-4 py-2 text-white d-flex flex-wrap align-items-center gap-2 gap-md-3 fw-bold mb-3 rounded-pill"
+         style="background-color: var(--ac-blue, #0088ff);">
+        <span>{{ pedido.fecha_creacion_larga if es_edicion else (fecha_larga or '') }}</span>
+        <span>{{ pedido.hora_creacion if es_edicion else (hora_actual or '') }}</span>
+        <span>Folio: <span data-folio-sugerido>{{ pedido.folio if es_edicion else folio_sugerido }}</span></span>
+        <div class="ms-auto d-flex flex-wrap align-items-center justify-content-end gap-2">
+            {% if es_edicion %}
+            <span class="small"><i class="bi bi-pencil-square me-1"></i>Editando</span>
+            {% if origen_form == 'pedidos' %}
+            <a href="{{ url_for('dashboard.index') }}" class="btn btn-sm btn-outline-light rounded-pill pf-volver-dashboard">Volver al Dashboard</a>
+            {% endif %}
+            {% endif %}
+            <button type="button" class="btn btn-sm btn-light rounded-pill px-3" data-pf-toggle-preview
+                    aria-controls="preview-nota-home-{{ uid }}" aria-expanded="false">
+                <i class="bi bi-eye me-1"></i><span data-pf-toggle-preview-texto>Ver vista previa</span>
+            </button>
+            {% if puede_cancelar %}
+            <button type="button" class="btn btn-sm btn-outline-danger bg-white rounded-pill px-3"
+                    data-bs-toggle="collapse" data-bs-target="#cancelar-{{ uid }}" aria-expanded="false">
+                <i class="bi bi-x-circle me-1"></i>Cancelar pedido
+            </button>
+            {% endif %}
+            <button type="button" class="btn btn-danger btn-sm rounded-circle p-0 d-flex align-items-center justify-content-center pf-cerrar-modal"
+                    data-bs-dismiss="modal" aria-label="Cerrar" style="width: 30px; height: 30px; font-weight: bold;">✕</button>
+        </div>
+    </div>
+
+    {% if puede_cancelar %}
+    <!-- Panel de cancelación: formulario independiente, fuera del formulario principal -->
+    <div class="collapse mb-4" id="cancelar-{{ uid }}">
+        <form action="{{ url_for('pedidos.cancelar_pedido', id_pedido=pedido.id_pedido) }}" method="POST"
+              class="form-card border border-danger border-2 mb-0"
+              onsubmit="return confirm('¿Cancelar el pedido {{ pedido.folio }}? Esta acción no se puede deshacer.');">
+            <input type="hidden" name="origen" value="{{ origen_form }}">
+            <input type="hidden" name="token_envio" value="{{ token_envio() }}">
+
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="section-title text-danger mb-0"><i class="bi bi-exclamation-triangle me-2"></i>Cancelar pedido {{ pedido.folio }}</h5>
+                <button type="button" class="btn-close" data-bs-toggle="collapse" data-bs-target="#cancelar-{{ uid }}" aria-label="Cerrar"></button>
+            </div>
+
+            <input type="text" name="motivo" class="form-control mb-3" maxlength="200"
+                   placeholder="Motivo de la cancelación" required>
+
+            {% if pedido.total_pagado > 0 %}
+            <div class="form-check form-switch mb-3">
+
+                <input class="form-check-input" type="checkbox" name="devolver" id="devolver-{{ uid }}" checked style="cursor: pointer;">
+                <label class="form-check-label small" for="devolver-{{ uid }}" style="cursor: pointer;">
+                    Registrar devolución de <strong>${{ '%.2f'|format(pedido.total_pagado) }}</strong> en caja
+                </label>
+            </div>
+            {% endif %}
+
+            <div class="d-flex justify-content-end gap-2">
+                <button type="button" class="btn btn-outline-secondary rounded-pill px-4"
+                        data-bs-toggle="collapse" data-bs-target="#cancelar-{{ uid }}">No cancelar</button>
+                <button type="submit" class="btn btn-danger rounded-pill px-4 fw-semibold">Confirmar cancelación</button>
+            </div>
+        </form>
+    </div>
+    {% endif %}
+    <div class="row g-4 pf-layout">
+        <div class="col-lg-6 pf-col-form">
+
+    <!-- ============ FORMULARIO PRINCIPAL (alta / edición) ============ -->
+    <form action="{{ url_for('pedidos.registrar_pedido') }}" method="POST"
+          {% if es_edicion %}data-edicion-ajax="1"
+          data-url-tarjeta="{{ url_for('pedidos.tarjeta_pedido', id_pedido=pedido.id_pedido) }}"{% endif %}>
+        <input type="hidden" name="origen" value="{{ origen_form }}">
+        <input type="hidden" name="token_envio" value="{{ token_envio() }}">
+        {% if es_edicion %}
+            <input type="hidden" name="pedido_id" value="{{ pedido.id_pedido }}">
+            <div class="alert alert-danger rounded-3 py-2 mb-3" data-edicion-error role="alert" hidden></div>
+        {% endif %}
+
+        <!-- Datos del cliente y fecha de entrega -->
+        <div class="form-card">
+            <h5 class="section-title">Datos del cliente y fecha de entrega</h5>
+            {% set cliente_vinculado = pedido.cliente if es_edicion and pedido.id_cliente and modulo_activo('clientes') else none %}
+            <div class="pf-fila-cliente">
+            <div class="position-relative pf-cliente-buscador">
+                <input type="text" class="form-control pf-cliente-nombre" name="nombre_cliente" placeholder="Nombre completo:" style="text-transform: uppercase"
+                       value="{{ pedido.nombre_cliente if es_edicion else '' }}" required
+                       autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false">
+                <input type="hidden" name="id_cliente" value="{{ cliente_vinculado.id_cliente if cliente_vinculado else '' }}">
+                <div class="pf-cliente-pastilla {% if not cliente_vinculado %}d-none{% endif %}">
+                    <span class="badge rounded-pill text-bg-success px-2 py-1 d-inline-flex align-items-center gap-2">
+                        <span class="pf-cliente-pastilla-texto">{% if cliente_vinculado %}Cliente {{ cliente_vinculado.clave }} ✓{% endif %}</span>
+                        <button type="button" class="btn btn-link p-0 text-white text-decoration-none lh-1 pf-cliente-desvincular"
+                                title="Desvincular cliente" aria-label="Desvincular cliente">✕</button>
+                    </span>
+                    <span class="badge rounded-pill text-bg-light border small pf-lista-etiqueta d-none"></span>
+                </div>
+
+                {% if es_edicion %}
+                <script>
+                (() => {
+                    function nuevoTokenEnvio() {
+                        if (typeof window.nuevoTokenEnvio === 'function') return window.nuevoTokenEnvio();
+                        const bytes = new Uint8Array(16);
+                        crypto.getRandomValues(bytes);
+                        return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+                    }
+
+                    function mostrarToast(mensaje) {
+                        const toast = document.getElementById('pf-notif-toast');
+                        const texto = document.getElementById('pf-notif-toast-texto');
+                        if (!toast || !texto) return;
+                        const titulo = toast.querySelector('.toast-header strong');
+                        if (titulo) titulo.textContent = 'Pedido actualizado';
+                        texto.textContent = mensaje;
+                        bootstrap.Toast.getOrCreateInstance(toast).show();
+                    }
+
+                    function cerrarModal(form) {
+                        const modal = form.closest('.modal');
+                        if (modal) bootstrap.Modal.getOrCreateInstance(modal).hide();
+                    }
+
+                    function descargarPdf(url) {
+                        const enlace = document.createElement('a');
+                        enlace.href = url;
+                        enlace.style.display = 'none';
+                        document.body.appendChild(enlace);
+                        enlace.click();
+                        enlace.remove();
+                    }
+
+                    function actualizarContadores() {
+                        window.aplicarFiltrosTablero?.();
+                        window.recalcularContadores?.();
+                        const tablero = document.querySelector('.kanban-board');
+                        if (!tablero) return;
+                        const saldoTerminado = [...tablero.querySelectorAll(
+                            '.columna-kanban[data-col="terminado"] .card-pedido',
+                        )].reduce((total, tarjeta) => total + (Number(tarjeta.dataset.saldo) || 0), 0);
+                        window.actualizarPorCobrar?.(saldoTerminado);
+                    }
+
+                    async function refrescarTarjeta(form, idPedido) {
+                        if (typeof window.reemplazarTarjeta !== 'function' || !form.dataset.urlTarjeta) return;
+                        const respuesta = await fetch(form.dataset.urlTarjeta, {
+                            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                            cache: 'no-store',
+                        });
+                        const datos = await respuesta.json().catch(() => null);
+                        if (!respuesta.ok || !datos?.ok || !datos.html_tarjeta) return;
+                        const tarjeta = window.reemplazarTarjeta(idPedido, datos.html_tarjeta);
+                        if (!tarjeta) return;
+                        window.ignorarEcoPedido?.(idPedido, tarjeta);
+                        actualizarContadores();
+                    }
+
+                    async function confirmarEfectivo(monto) {
+                        if (typeof window.cobrarEfectivo !== 'function') {
+                            throw new Error('No está disponible el cobro de efectivo.');
+                        }
+                        if (typeof window.cobrarEfectivoSoloConfirmar === 'function') {
+                            return window.cobrarEfectivoSoloConfirmar(monto);
+                        }
+                        const boton = document.getElementById('efectivoConfirmar');
+                        const tipoOriginal = boton?.type;
+                        if (boton) boton.type = 'button';
+                        try {
+                            return await window.cobrarEfectivo(monto);
+                        } finally {
+                            if (boton?.isConnected && tipoOriginal) boton.type = tipoOriginal;
+                        }
+                    }
+
+                    window.inicializarEdicionPedidoAjax = form => {
+                        if (!form || form.dataset.edicionAjaxInicializada) return;
+                        form.dataset.edicionAjaxInicializada = '1';
+                        form.addEventListener('submit', async evento => {
+                            evento.preventDefault();
+                            evento.stopImmediatePropagation();
+                            const botones = [...form.querySelectorAll('button[type="submit"]')];
+                            const submitter = evento.submitter;
+                            const accion = submitter?.name === 'accion' ? submitter.value : 'guardar';
+                            const datos = new FormData(form);
+                            datos.set('accion', accion);
+                            const error = form.querySelector('[data-edicion-error]');
+                            const token = form.querySelector('[name="token_envio"]');
+                            const idPedido = form.querySelector('[name="pedido_id"]').value;
+                            botones.forEach(boton => { boton.disabled = true; });
+                            if (error) error.hidden = true;
+
+                            try {
+                                const metodo = form.querySelector('[name="metodo_pago"]:checked')?.value;
+                                const monto = Number(form.querySelector('[name="anticipo"]')?.value);
+                                if (metodo === 'Efectivo' && Number.isFinite(monto) && monto > 0) {
+                                    if (!await confirmarEfectivo(monto)) return;
+                                }
+
+                                const respuesta = await fetch(form.action, {
+                                    method: 'POST',
+                                    body: datos,
+                                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                                });
+                                const resultado = await respuesta.json().catch(() => null);
+
+                                if (resultado?.duplicado) {
+                                    cerrarModal(form);
+                                    mostrarToast(resultado.mensaje);
+                                    try {
+                                        await refrescarTarjeta(form, idPedido);
+                                    } catch (errorRefresco) {
+                                        console.error('No se pudo refrescar el pedido duplicado.', errorRefresco);
+                                    }
+                                    return;
+                                }
+                                if (!respuesta.ok || !resultado?.ok) {
+                                    throw new Error(resultado?.mensaje || 'No se pudo guardar el pedido.');
+                                }
+
+                                cerrarModal(form);
+                                if (resultado.recargar) {
+                                    mostrarToast(resultado.mensaje);
+                                    if (resultado.url_pdf) descargarPdf(resultado.url_pdf);
+                                    setTimeout(() => window.location.reload(), resultado.url_pdf ? 300 : 0);
+                                    return;
+                                }
+
+                                if (resultado.html_tarjeta && typeof window.reemplazarTarjeta === 'function') {
+                                    const tarjeta = window.reemplazarTarjeta(idPedido, resultado.html_tarjeta);
+                                    if (tarjeta) {
+                                        window.ignorarEcoPedido?.(idPedido, tarjeta);
+                                        actualizarContadores();
+                                    }
+                                }
+                                mostrarToast(resultado.mensaje);
+                                if (resultado.url_pdf) descargarPdf(resultado.url_pdf);
+                            } catch (errorGuardado) {
+                                if (error) {
+                                    error.textContent = errorGuardado.message || 'No se pudo guardar el pedido.';
+                                    error.hidden = false;
+                                }
+                                if (token) token.value = nuevoTokenEnvio();
+                            } finally {
+                                botones.forEach(boton => {
+                                    if (boton.isConnected) boton.disabled = false;
+                                });
+                            }
+                        });
+                    };
+
+                    document.querySelectorAll('form[data-edicion-ajax]').forEach(window.inicializarEdicionPedidoAjax);
+                })();
+                </script>
+                {% endif %}
+                {# Vacío = el backend usa la lista predeterminada #}
+                <input type="hidden" name="id_lista_precio" class="pf-lista-precio"
+                       value="{{ pedido.id_lista_precio if cliente_vinculado and pedido.id_lista_precio else '' }}"
+                       data-url-listas="{{ url_for('pedidos.listar_listas_precio') }}">
+            </div>
+            <div>
+                <input type="text" class="form-control" name="telefono_cliente" placeholder="Teléfono de contacto:"
+                       value="{{ pedido.telefono_cliente if es_edicion else '' }}" required>
+            </div>
+            <div>
+                <input type="date" class="form-control" name="fecha_entrega" aria-label="Fecha de entrega"
+                       value="{{ entrega.strftime('%Y-%m-%d') if entrega else '' }}" required>
+            </div>
+            <div>
+                <input type="time" class="form-control" name="hora_entrega" aria-label="Hora de entrega"
+                       value="{{ entrega.strftime('%H:%M') if entrega else '' }}" required>
+            </div>
+            </div>
+            <div class="pf-atajos">
+                {% if puede('clientes.crear') %}
+                <div class="form-check m-0 pf-guardar-cliente {% if cliente_vinculado %}d-none{% endif %}">
+                    <input class="form-check-input" type="checkbox" name="guardar_cliente" id="guardar-cliente-{{ uid }}">
+                    <label class="form-check-label small" for="guardar-cliente-{{ uid }}">Guardar cliente</label>
+                </div>
+                {% endif %}
+                <div class="pf-atajos-grupo d-flex flex-wrap align-items-center gap-1 ms-auto">
+                {% for dias, etiqueta in [(0, 'Hoy'), (1, 'Mañana'), (3, 'En 3 días'), (7, '1 semana')] %}
+                <button type="button" class="btn btn-sm btn-light border rounded-pill"
+                        onclick="fijarFechaEntrega(this, {{ dias }})">{{ etiqueta }}</button>
+                {% endfor %}
+                <span class="pf-atajos-separador" aria-hidden="true"></span>
+                {% for hhmm, etiqueta in [('10:00', '10 am'), ('12:00', '12 pm'), ('15:00', '3 pm'), ('17:00', '5 pm'), ('18:00', '6 pm')] %}
+                <button type="button" class="btn btn-sm btn-light border rounded-pill"
+                        onclick="fijarHoraEntrega(this, '{{ hhmm }}')">{{ etiqueta }}</button>
+                {% endfor %}
+            </div>
+            </div>
+        </div>
+
+
+        <!-- Productos -->
+        <div class="form-card">
+            {% set responsables_tabla = namespace(ids=[]) %}
+            {% if es_edicion %}
+                {% for detalle in pedido.detalles %}
+                    {% set id_responsable = detalle.asignacion.id_usuario if detalle.asignacion else '' %}
+                    {% if id_responsable not in responsables_tabla.ids %}
+                        {% set responsables_tabla.ids = responsables_tabla.ids + [id_responsable] %}
+                    {% endif %}
+                {% endfor %}
+            {% endif %}
+            <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
+                <h5 class="section-title mb-0">Productos</h5>
+                <div class="d-flex flex-wrap align-items-end gap-2 ms-auto">
+                    <div>
+                        <label class="form-label small fw-semibold mb-1" for="asignar-todos-{{ uid }}">Responsable para todos</label>
+                        <select class="form-select select-asignar-todos" id="asignar-todos-{{ uid }}" aria-label="Responsable para todos">
+                            {% if responsables_tabla.ids|length > 1 %}
+                            <option value="__varios__" selected disabled>Varios</option>
+                            {% endif %}
+                            <option value="" {% if responsables_tabla.ids|length <= 1 and (not responsables_tabla.ids or responsables_tabla.ids[0] == '') %}selected{% endif %}>Sin asignar</option>
+                            {% for user in lista_responsables %}
+                            <option value="{{ user.id_usuario }}" {% if responsables_tabla.ids|length == 1 and responsables_tabla.ids[0]|string == user.id_usuario|string %}selected{% endif %}>{{ user.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="button" class="btn btn-primary btn-sm rounded-5" onclick="agregarFila(this)">+ Agregar Producto</button>
+                </div>
+            </div>
+            {% set usa_catalogo = puede('productos.usar') %}
+            <div class="table-responsive">
+                <table class="table align-middle tabla-productos-dinamica"{% if usa_catalogo %}
+                        data-url-buscar="{{ url_for('productos.buscar') }}"
+                        data-url-cotizar="{{ url_for('productos.cotizar_producto') }}"{% endif %}>
+                    <thead>
+                        <tr>
+                            <th style="width: 10%;">Cantidad</th>
+                            <th style="width: 34%;">Descripción</th>
+                            <th style="width: 15%;">Precio</th>
+                            <th style="width: 15%;">Subtotal</th>
+                            <th style="width: 21%;">Responsable</th>
+                            <th style="width: 5%;"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if es_edicion and pedido.detalles %}
+                            {% for d in pedido.detalles %}
+                            <tr>
+                                <td><input type="number" step="any" min="0.01" class="form-control" name="cantidad[]"
+                                           value="{{ '%g'|format(d.cantidad|float) }}" oninput="calcularSubtotal(this)" required></td>
+                                <td><input type="hidden" name="detalle_id[]" value="{{ d.id_detalle }}">
+                                    <input type="text" class="form-control {% if usa_catalogo %}pf-producto-descripcion{% endif %}" name="descripcion[]" value="{{ d.descripcion }}"
+                                           placeholder="Ej. Lona 1x2 mts" required autocomplete="off"{% if usa_catalogo %} role="combobox" aria-autocomplete="list" aria-expanded="false"{% endif %}>
+                                    <input type="hidden" name="producto_id[]" value="{{ d.id_producto or '' }}">
+                                    <input type="hidden" name="presentacion_id[]" value="{{ d.id_presentacion or '' }}">
+                                    <input type="hidden" name="configuracion[]" value='{{ d.configuracion|tojson if d.configuracion else '' }}'>
+                                </td>
+                                <td><input type="text" inputmode="decimal" class="form-control" name="precio_unitario[]"
+                                           value="{{ '%.2f'|format(d.precio_unitario|float) }}" oninput="calcularSubtotal(this)" required></td>
+                                <td><input type="text" class="form-control subtotal-field bg-light" readonly
+                                           value="${{ '%.2f'|format((d.cantidad|float) * (d.precio_unitario|float)) }}"></td>
+                                <td>
+                                    <select class="form-select select-responsable-producto" name="responsable_producto[]">
+                                        <option value="">Sin asignar</option>
+                                        {% for user in lista_responsables %}
+                                        <option value="{{ user.id_usuario }}" {% if d.asignacion and d.asignacion.id_usuario == user.id_usuario %}selected{% endif %}>{{ user.nombre }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
+                                <td><button type="button" class="btn btn-outline-danger btn-sm" onclick="eliminarFilaProducto(this)">✕</button></td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td><input type="number" step="any" min="0.01" class="form-control" name="cantidad[]" value="1"
+                                           oninput="calcularSubtotal(this)" required></td>
+                                <td><input type="hidden" name="detalle_id[]" value="">
+                                    <input type="text" class="form-control {% if usa_catalogo %}pf-producto-descripcion{% endif %}" name="descripcion[]" placeholder="Ej. Lona 1x2 mts"
+                                           required autocomplete="off"{% if usa_catalogo %} role="combobox" aria-autocomplete="list" aria-expanded="false"{% endif %}>
+                                    <input type="hidden" name="producto_id[]" value="">
+                                    <input type="hidden" name="presentacion_id[]" value="">
+                                    <input type="hidden" name="configuracion[]" value="">
+                                </td>
+                                <td><input type="text" inputmode="decimal" class="form-control" name="precio_unitario[]" placeholder="0.00"
+                                           oninput="calcularSubtotal(this)" required></td>
+                                <td><input type="text" class="form-control subtotal-field bg-light" readonly value="$0.00"></td>
+                                <td>
+                                    <select class="form-select select-responsable-producto" name="responsable_producto[]">
+                                        <option value="">Sin asignar</option>
+                                        {% for user in lista_responsables %}
+                                        <option value="{{ user.id_usuario }}">{{ user.nombre }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
+                                <td><button type="button" class="btn btn-outline-danger btn-sm" onclick="eliminarFilaProducto(this)">✕</button></td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="mt-3">
+                <label class="form-label fw-semibold small mb-1" for="notas-{{ uid }}">Notas</label>
+                <textarea class="form-control" name="notas" id="notas-{{ uid }}" rows="3"
+                          placeholder="Especificaciones técnicas o detalles para el taller...">{{ pedido.notas if es_edicion and pedido.notas else '' }}</textarea>
+            </div>
+            <div class="d-flex flex-wrap justify-content-end align-items-baseline gap-2 gap-md-4 mt-3 pf-totales">
+                <div>Subtotal: <span class="gran-subtotal-display">${{ '%.2f'|format(pedido.subtotal|float) if es_edicion else '0.00' }}</span></div>
+                <div class="iva-resumen {% if not (es_edicion and pedido.requiere_factura) %}d-none{% endif %}">
+                    IVA {{ (TASA_IVA * 100)|round|int }}%: <span class="iva-display">${{ '%.2f'|format(pedido.iva|float) if es_edicion else '0.00' }}</span>
+                </div>
+                <div class="fw-bold fs-5">Total:
+                    <span class="gran-total-display text-primary">${{ '%.2f'|format(pedido.total_float) if es_edicion else '0.00' }}</span>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- Pago inicial o nuevo abono -->
+        <div class="form-card tarjeta-pago"
+             data-pagado="{{ '%.2f'|format(pedido.total_pagado) if es_edicion else '0.00' }}">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                <h5 class="section-title mb-0">Pago</h5>
+                {% if es_edicion and pedido.historial_pagos %}
+                <button type="button" class="btn btn-sm btn-light border rounded-pill px-3 pf-registro-pagos-toggle"
+                        data-bs-toggle="collapse" data-bs-target="#registro-pagos-{{ uid }}"
+                        aria-expanded="false" aria-controls="registro-pagos-{{ uid }}">
+                    <i class="bi bi-receipt me-1"></i>Registro de pagos ({{ pedido.historial_pagos|length }}) · $<span class="pagado-registro-display">{{ '%.2f'|format(pedido.total_pagado) }}</span>
+                </button>
+                {% endif %}
+            </div>
+            {% if es_edicion and pedido.historial_pagos %}
+            <div class="collapse mb-3" id="registro-pagos-{{ uid }}">
+                <div class="table-responsive">
+                    <table class="table align-middle tabla-registro-pagos mb-0">
+                        <thead>
+                            <tr>
+                                <th>Método de pago</th>
+                                <th>Fecha y Hora</th>
+                                <th>Cantidad</th>
+                                <th>Restante</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% set acumulado = namespace(valor=0) %}
+                            {% for fila in pedido.historial_pagos %}
+                            {% set acumulado.valor = acumulado.valor + fila.monto %}
+                            {% set restante_fila = [pedido.total_float - acumulado.valor, 0]|max %}
+                            <tr data-acumulado="{{ '%.2f'|format(acumulado.valor) }}">
+                                <td>{{ fila.metodo_pago }}</td>
+                                <td>{{ fila.fecha_pago.strftime('%d/%m/%Y %I:%M %p') if fila.fecha_pago else 'N/A' }}</td>
+                                <td>${{ '%.2f'|format(fila.monto) }}</td>
+                                <td class="fw-bold restante-registro {% if restante_fila > 0 %}text-danger{% else %}text-success{% endif %}">${{ '%.2f'|format(restante_fila) }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+            <div class="d-flex flex-wrap align-items-start gap-2 pf-fila-pago">
+                <div class="d-flex flex-wrap gap-2" role="group" aria-label="Método de pago">
+                    <input type="radio" class="btn-check" name="metodo_pago" id="metodo-efectivo-{{ uid }}"
+                           value="Efectivo" autocomplete="off" checked>
+                    <label class="btn btn-outline-primary rounded-pill px-3" for="metodo-efectivo-{{ uid }}">Efectivo</label>
+                    <input type="radio" class="btn-check" name="metodo_pago" id="metodo-tarjeta-{{ uid }}"
+                           value="Tarjeta" autocomplete="off"{% if es_edicion and pedido.requiere_factura %} disabled{% endif %}>
+                    <label class="btn btn-outline-primary rounded-pill px-3" for="metodo-tarjeta-{{ uid }}">Tarjeta</label>
+                    <input type="radio" class="btn-check" name="metodo_pago" id="metodo-transferencia-{{ uid }}"
+                           value="Transferencia" autocomplete="off">
+                    <label class="btn btn-outline-primary rounded-pill px-3" for="metodo-transferencia-{{ uid }}">
+                        <span class="etiqueta-transferencia">Transferencia{% if es_edicion and pedido.requiere_factura %} (cuenta fiscal){% endif %}</span>
+                    </label>
+                </div>
+                <div class="ms-auto d-flex flex-wrap align-items-start gap-2">
+                    <div class="pf-cantidad-pago">
+                        <input type="number" step="0.01" min="0" name="anticipo" id="anticipo-{{ uid }}"
+                               class="form-control input-anticipo" value="0" aria-label="Cantidad" placeholder="Cantidad">
+                        <div class="invalid-feedback mensaje-anticipo-error"></div>
+                    </div>
+                    <button type="button" class="btn btn-outline-secondary rounded-pill px-4 btn-liquidar">Liquidó</button>
+                </div>
+            </div>
+
+            <div class="small mt-3 linea-resumen-pago" aria-live="polite">
+                {% if es_edicion %}<span>Pagado: <strong class="pagado-display">${{ '%.2f'|format(pedido.total_pagado) }}</strong> · </span>{% endif %}
+                Este pago: <strong class="pago-display">$0.00</strong> · Resta: <strong class="resta-display">$0.00</strong>
+                <span class="badge bg-success rounded-pill ms-1 badge-liquidado d-none">Liquidado</span>
+            </div>
+            <div class="small text-primary mt-2 resumen-comision d-none" aria-live="polite">
+                Comisión {{ (TASA_COMISION_TARJETA * 100)|round|int }}%: <strong class="comision-display">$0.00</strong>
+                · Cobrar en terminal: <strong class="cobro-terminal-display">$0.00</strong>
+            </div>
+        </div>
+
+        <!-- Datos fiscales de facturación -->
+        <div class="form-card tarjeta-factura">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="section-title mb-0">Factura</h5>
+                <div class="form-check form-switch m-0">
+                    <input class="form-check-input" type="checkbox" name="requiere_factura"
+                           id="factura-{{ uid }}" style="cursor: pointer;"
+                           {% if es_edicion and pedido.requiere_factura %}checked{% endif %}>
+                    <label class="form-check-label fw-semibold" for="factura-{{ uid }}" style="cursor: pointer;">Requiere factura</label>
+                </div>
+            </div>
+            {% set datos_factura = pedido.factura if es_edicion else none %}
+            <div class="campos-factura {% if not (es_edicion and pedido.requiere_factura) %}d-none{% endif %}">
+                <div class="row g-3 resumen-factura d-none" data-fiscal-resumen>
+                    <div class="col-md-4"><div class="form-label fw-semibold mb-1">RFC</div><div data-fiscal-resumen-campo="rfc">—</div></div>
+                    <div class="col-md-4"><div class="form-label fw-semibold mb-1">Razón social</div><div data-fiscal-resumen-campo="razon_social">—</div></div>
+                    <div class="col-md-4"><div class="form-label fw-semibold mb-1">Régimen fiscal</div><div data-fiscal-resumen-campo="regimen">—</div></div>
+                    <div class="col-md-4"><div class="form-label fw-semibold mb-1">CP fiscal</div><div data-fiscal-resumen-campo="cp">—</div></div>
+                    <div class="col-md-4"><div class="form-label fw-semibold mb-1">Uso de CFDI</div><div data-fiscal-resumen-campo="uso_cfdi">—</div></div>
+                    <div class="col-md-4"><div class="form-label fw-semibold mb-1">Correo</div><div data-fiscal-resumen-campo="correo">—</div></div>
+                </div>
+                <div class="text-end mt-3 d-none" data-fiscal-editar-wrap>
+                    <button type="button" class="btn btn-outline-primary rounded-pill px-4" data-fiscal-editar>Editar</button>
+                </div>
+                <div class="row g-3" data-fiscal-inputs>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold" for="rfc-{{ uid }}">RFC</label>
+                        <input type="text" class="form-control dato-factura factura-mayusculas" name="rfc" id="rfc-{{ uid }}"
+                               maxlength="13" value="{{ datos_factura.rfc if datos_factura else '' }}"
+                               {% if not (es_edicion and pedido.requiere_factura) %}disabled{% endif %}>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold" for="razon-social-{{ uid }}">Razón social</label>
+                        <input type="text" class="form-control dato-factura factura-mayusculas" name="razon_social" id="razon-social-{{ uid }}"
+                               maxlength="200" value="{{ datos_factura.razon_social if datos_factura else '' }}"
+                               {% if not (es_edicion and pedido.requiere_factura) %}disabled{% endif %}>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold" for="regimen-fiscal-{{ uid }}">Régimen fiscal</label>
+                        <select class="form-select dato-factura" name="regimen_fiscal" id="regimen-fiscal-{{ uid }}"
+                                {% if not (es_edicion and pedido.requiere_factura) %}disabled{% endif %}>
+                            <option value="">Selecciona un régimen fiscal</option>
+                            {% for clave, descripcion in REGIMENES_FISCALES %}
+                            <option value="{{ clave }}" {% if datos_factura and datos_factura.regimen_fiscal == clave %}selected{% endif %}>{{ clave }} · {{ descripcion }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold" for="cp-fiscal-{{ uid }}">CP fiscal</label>
+                        <input type="text" inputmode="numeric" class="form-control dato-factura factura-mayusculas" name="cp_fiscal" id="cp-fiscal-{{ uid }}"
+                               maxlength="5" pattern="[0-9]{5}" value="{{ datos_factura.cp_fiscal if datos_factura else '' }}"
+                               {% if not (es_edicion and pedido.requiere_factura) %}disabled{% endif %}>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold" for="uso-cfdi-{{ uid }}">Uso de CFDI</label>
+                        <select class="form-select dato-factura" name="uso_cfdi" id="uso-cfdi-{{ uid }}"
+                                {% if not (es_edicion and pedido.requiere_factura) %}disabled{% endif %}>
+                            <option value="">Selecciona un uso de CFDI</option>
+                            {% for clave, descripcion in USOS_CFDI %}
+                            <option value="{{ clave }}" {% if datos_factura and datos_factura.uso_cfdi == clave %}selected{% endif %}>{{ clave }} · {{ descripcion }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold" for="correo-factura-{{ uid }}">Correo (opcional)</label>
+                        <input type="email" class="form-control dato-factura" name="correo_factura" id="correo-factura-{{ uid }}"
+                               maxlength="120" value="{{ datos_factura.correo if datos_factura and datos_factura.correo else '' }}"
+                               {% if not (es_edicion and pedido.requiere_factura) %}disabled{% endif %}>
+                    </div>
+                </div>
+                <div class="alert alert-warning py-2 mt-3 mb-0 d-none" data-fiscal-error role="status"></div>
+            </div>
+        </div>
+        <!-- Botones finales -->
+        <div class="row g-3 d-flex justify-content-between">
+            <div class="col-md-6">
+                <button type="submit" name="accion" value="pdf" class="btn btn-custom-send rounded-pill px-5 fw-bold shadow-sm w-100">
+                    Guardar y descargar PDF
+                </button>
+            </div>
+            <div class="col-md-6">
+                <button type="submit" name="accion" value="guardar" class="btn btn-custom-save rounded-pill px-5 fw-bold shadow-sm w-100">
+                    Guardar
+                </button>
+            </div>
+        </div>
+    </form>
+    <!-- ============ FIN FORMULARIO PRINCIPAL ============ -->
+    </div>
+
+    <aside class="col-lg-6 d-none d-lg-block nota-preview-panel"
+           data-preview-url="{{ url_for('pedidos.vista_previa_nota_pedido') }}">
+        <div class="nota-preview-sticky">
+            <div class="form-card">
+                <h5 class="section-title">Vista previa de la nota</h5>
+                <div class="nota-preview-home" id="preview-nota-home-{{ uid }}">
+                    <div class="nota-preview-content">
+                        <div class="d-flex align-items-center gap-2 text-muted small mb-2 preview-spinner" role="status">
+                            <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                            <span>Cargando vista previa…</span>
+                        </div>
+                        <iframe class="nota-preview-iframe" title="Vista previa de nota" hidden></iframe>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <div class="modal fade" id="modalNotaPedido-{{ uid }}" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Vista previa de la nota</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body preview-modal-host" id="preview-nota-modal-{{ uid }}"></div>
+            </div>
+        </div>
+    </div>
+  </div>
+
+</div>

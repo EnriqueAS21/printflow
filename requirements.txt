@@ -1,0 +1,17 @@
+Flask
+Flask-SQLAlchemy
+SQLAlchemy
+python-dotenv>=1.0,<2
+Werkzeug
+click
+MarkupSafe
+psycopg2-binary
+reportlab>=4.4,<6
+pymupdf>=1.24,<2
+Pillow>=10,<14
+numpy>=1.26,<3
+qrcode>=7.4,<9
+waitress
+pywin32; sys_platform == "win32"
+psycopg[binary]
+Flask-Compress>=1.15

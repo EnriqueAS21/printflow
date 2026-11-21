@@ -1,0 +1,129 @@
+{% extends 'base.html' %}
+{% block title %}Área Creativa - Reporte de ventas{% endblock %}
+{% block styles %}{% include 'reportes/_estilos.html' %}{% endblock %}
+
+{% block content %}
+{% from 'reportes/_macros.html' import dinero %}
+<div class="rep-wrap">
+  {% with tab='ventas' %}{% include 'reportes/_tabs.html' %}{% endwith %}
+
+  <form method="get" id="form-rep" class="rep-card rep-filtros no-print">
+    <div class="row g-2 align-items-end">
+      <div class="col-6 col-md-2">
+        <label class="form-label small fw-bold text-muted mb-1">Desde</label>
+        <input type="date" name="desde" id="desde" class="form-control" value="{{ desde }}">
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label small fw-bold text-muted mb-1">Hasta</label>
+        <input type="date" name="hasta" id="hasta" class="form-control" value="{{ hasta }}">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-bold text-muted mb-1">Método de pago</label>
+        <select name="metodo" class="form-select">
+          <option value="">Todos</option>
+          {% for m in metodos %}<option value="{{ m }}" {% if metodo == m %}selected{% endif %}>{{ m }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-6 d-flex flex-wrap gap-2 justify-content-md-end">
+        <div class="btn-group">
+          <button type="button" class="btn btn-outline-secondary rounded-start-pill" onclick="fijarRango('hoy')">Hoy</button>
+          <button type="button" class="btn btn-outline-secondary" onclick="fijarRango('semana')">Semana</button>
+          <button type="button" class="btn btn-outline-secondary rounded-end-pill" onclick="fijarRango('mes')">Mes</button>
+        </div>
+        <button type="submit" class="btn btn-primary rounded-pill px-4">Aplicar</button>
+        <a class="btn btn-outline-success rounded-pill"
+           href="{{ url_for('reportes.ventas', desde=desde, hasta=hasta, metodo=metodo, formato='csv') }}">CSV</a>
+        <button type="button" class="btn btn-outline-dark rounded-pill" onclick="window.print()">PDF / Imprimir</button>
+      </div>
+    </div>
+  </form>
+
+  <div class="rep-membrete">
+    <h4 class="fw-bold mb-0">Reporte de ventas y flujo de caja</h4>
+    <div class="small text-muted">
+      {{ config.get('NOMBRE_CLIENTE', 'Área Creativa') }} · Del {{ desde.strftime('%d/%m/%Y') }} al {{ hasta.strftime('%d/%m/%Y') }}
+      {% if metodo %} · Método: {{ metodo }}{% endif %} · Generado {{ generado.strftime('%d/%m/%Y %I:%M %p') }}
+    </div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-6 col-lg-3"><div class="kpi"><small>Ventas por pedidos de taller</small>
+      <strong class="text-primary">{{ dinero(datos.ventas_pedidos) }}</strong></div></div>
+    <div class="col-6 col-lg-3"><div class="kpi"><small>Ventas de mostrador (tickets)</small>
+      <strong class="text-primary">{{ dinero(datos.ventas_mostrador) }}</strong></div></div>
+    <div class="col-6 col-lg-3"><div class="kpi"><small>Egresos registrados</small>
+      <strong class="text-danger">{{ dinero(datos.egresos) }}</strong></div></div>
+    <div class="col-6 col-lg-3"><div class="kpi"><small>Balance neto (entradas − salidas)</small>
+      <strong class="{{ 'text-success' if datos.balance >= 0 else 'text-danger' }}">{{ dinero(datos.balance) }}</strong></div></div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-5">
+      <div class="rep-card h-100">
+        <h5>Por método de pago</h5>
+        <div class="table-responsive">
+          <table class="table table-sm rep-table mb-0">
+            <thead><tr><th>Método</th><th class="num">Ventas</th><th class="num">Egresos</th><th class="num">Neto</th></tr></thead>
+            <tbody>
+              {% for m in datos.por_metodo %}
+              <tr><td>{{ m.metodo }}</td><td class="num">{{ dinero(m.ventas) }}</td>
+                  <td class="num">{{ dinero(m.egresos) }}</td><td class="num">{{ dinero(m.neto) }}</td></tr>
+              {% endfor %}
+            </tbody>
+            <tfoot><tr><td>Total</td><td class="num">{{ dinero(datos.total_ventas) }}</td>
+              <td class="num">{{ dinero(datos.egresos) }}</td><td class="num">{{ dinero(datos.balance) }}</td></tr></tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-7">
+      <div class="rep-card h-100 permitir-corte">
+        <h5>Flujo por día</h5>
+        <div class="table-responsive">
+          <table class="table table-sm rep-table mb-0">
+            <thead><tr><th>Fecha</th><th class="num">Pedidos</th><th class="num">Mostrador</th><th class="num">Egresos</th><th class="num">Neto</th></tr></thead>
+            <tbody>
+              {% for d in datos.por_dia %}
+              <tr><td>{{ d.fecha.strftime('%d/%m/%Y') }}</td><td class="num">{{ dinero(d.pedidos) }}</td>
+                  <td class="num">{{ dinero(d.mostrador) }}</td><td class="num">{{ dinero(d.egresos) }}</td>
+                  <td class="num fw-semibold">{{ dinero(d.neto) }}</td></tr>
+              {% else %}
+              <tr><td colspan="5" class="text-center text-muted py-3">Sin movimientos en este rango.</td></tr>
+              {% endfor %}
+            </tbody>
+            <tfoot><tr><td>Total</td><td class="num">{{ dinero(datos.ventas_pedidos) }}</td>
+              <td class="num">{{ dinero(datos.ventas_mostrador) }}</td><td class="num">{{ dinero(datos.egresos) }}</td>
+              <td class="num">{{ dinero(datos.balance) }}</td></tr></tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="rep-card permitir-corte mt-3">
+    <h5>Detalle de movimientos ({{ datos.filas|length }})</h5>
+    <div class="table-responsive">
+      <table class="table table-sm rep-table mb-0">
+        <thead><tr><th>Fecha y hora</th><th>Tipo</th><th>Folio</th><th>Cant.</th><th>Descripción</th><th>Método</th><th class="num">Importe</th></tr></thead>
+        <tbody>
+          {% for f in datos.filas %}
+          <tr class="{{ 'text-danger' if f.origen == 'Egreso' else '' }}">
+            <td class="text-nowrap">{{ f.fecha.strftime('%d/%m/%Y %H:%M') if f.fecha else '—' }}</td>
+            <td>{{ 'Egreso' if f.origen == 'Egreso' else 'Venta · ' ~ f.origen }}</td>
+            <td>{{ f.folio if f.folio != 'N/A' else '—' }}</td>
+            <td>{{ f.cantidad }}</td>
+            <td>{% for l in f.lineas %}<div>{{ l }}</div>{% endfor %}</td>
+            <td>{{ f.metodo_pago }}</td>
+            <td class="num">{{ dinero(f.subtotal) }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="7" class="text-center text-muted py-4">Sin movimientos en este rango.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}{% include 'reportes/_rango_js.html' %}{% endblock %}

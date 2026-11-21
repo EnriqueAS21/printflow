@@ -1,0 +1,115 @@
+{% extends 'base.html' %}
+
+{% block title %}Listas de precios - Área Creativa{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-5" style="max-width: 1000px;">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <div>
+            <h4 class="mb-1 fw-bold">Listas de precios</h4>
+            <p class="text-muted mb-0">Administra nombres, orden y disponibilidad de las listas.</p>
+        </div>
+        <a href="{{ url_for('productos.lista') }}" class="btn btn-outline-secondary rounded-pill px-4">Volver a productos</a>
+    </div>
+
+    {% if error %}<div class="alert alert-danger rounded-4" role="alert">{{ error }}</div>{% endif %}
+    <form id="formListas" data-url="{{ url_for('productos.administrar_listas') }}">
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="table-responsive">
+                <table class="table align-middle mb-0" id="tablaListas">
+                    <thead><tr><th>Nombre</th><th>Orden</th><th>Activa</th><th>Predeterminada</th><th>Ordenar</th></tr></thead>
+                    <tbody>
+                        {% for lista in listas %}
+                        <tr data-id="{{ lista.id_lista }}">
+                            <td><input class="form-control nombre-lista" maxlength="80" value="{{ lista.nombre }}" aria-label="Nombre de la lista"></td>
+                            <td><input class="form-control orden-lista" type="number" step="1" value="{{ lista.orden or 0 }}" aria-label="Orden"></td>
+                            <td class="text-center"><input class="form-check-input activa-lista" type="checkbox" {% if lista.activo %}checked{% endif %} aria-label="Lista activa"></td>
+                            <td class="text-center"><input class="form-check-input predeterminada-lista" type="radio" name="predeterminada" {% if lista.predeterminada %}checked{% endif %} aria-label="Lista predeterminada"></td>
+                            <td class="text-nowrap">
+                                <button type="button" class="btn btn-sm btn-outline-secondary subir-lista" aria-label="Subir">↑</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary bajar-lista" aria-label="Bajar">↓</button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <button type="button" class="btn btn-outline-primary rounded-pill px-4" id="agregarLista">+ Agregar lista</button>
+                <button type="submit" class="btn btn-primary rounded-pill px-4 fw-semibold">Guardar listas</button>
+            </div>
+        </div>
+        <div id="estadoListas" class="small mt-3" role="status" aria-live="polite"></div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+    const form = document.getElementById('formListas');
+    const cuerpo = document.querySelector('#tablaListas tbody');
+    const estado = document.getElementById('estadoListas');
+    const renumerar = () => [...cuerpo.querySelectorAll('.orden-lista')].forEach((campo, indice) => {
+        campo.value = indice;
+    });
+    const vincular = fila => {
+        fila.querySelector('.subir-lista').addEventListener('click', () => {
+            if (fila.previousElementSibling) {
+                cuerpo.insertBefore(fila, fila.previousElementSibling);
+                renumerar();
+            }
+        });
+        fila.querySelector('.bajar-lista').addEventListener('click', () => {
+            if (fila.nextElementSibling) {
+                cuerpo.insertBefore(fila.nextElementSibling, fila);
+                renumerar();
+            }
+        });
+    };
+    cuerpo.querySelectorAll('tr').forEach(vincular);
+    document.getElementById('agregarLista').addEventListener('click', () => {
+        const fila = document.createElement('tr');
+        fila.dataset.id = '';
+        fila.innerHTML = `<td><input class="form-control nombre-lista" maxlength="80" aria-label="Nombre de la lista"></td>
+            <td><input class="form-control orden-lista" type="number" step="1" value="${cuerpo.children.length}" aria-label="Orden"></td>
+            <td class="text-center"><input class="form-check-input activa-lista" type="checkbox" checked aria-label="Lista activa"></td>
+            <td class="text-center"><input class="form-check-input predeterminada-lista" type="radio" name="predeterminada" aria-label="Lista predeterminada"></td>
+            <td class="text-nowrap"><button type="button" class="btn btn-sm btn-outline-secondary subir-lista" aria-label="Subir">↑</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary bajar-lista" aria-label="Bajar">↓</button></td>`;
+        cuerpo.appendChild(fila);
+        vincular(fila);
+        fila.querySelector('.nombre-lista').focus();
+    });
+    form.addEventListener('submit', async evento => {
+        evento.preventDefault();
+        const predeterminada = cuerpo.querySelector('.predeterminada-lista:checked');
+        const listas = [...cuerpo.querySelectorAll('tr')].map(fila => ({
+            id_lista: fila.dataset.id || null,
+            nombre: fila.querySelector('.nombre-lista').value.trim(),
+            orden: Number(fila.querySelector('.orden-lista').value),
+            activo: fila.querySelector('.activa-lista').checked,
+            predeterminada: fila.querySelector('.predeterminada-lista') === predeterminada,
+        })).filter(lista => lista.id_lista || lista.nombre);
+        estado.textContent = 'Guardando…';
+        try {
+            const respuesta = await fetch(form.dataset.url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                body: JSON.stringify({ listas }),
+            });
+            if (respuesta.redirected) {
+                window.location.assign(respuesta.url);
+                return;
+            }
+            const cuerpoRespuesta = await respuesta.json();
+            if (!respuesta.ok) throw new Error(cuerpoRespuesta.error || 'No se pudieron guardar las listas.');
+            window.location.reload();
+        } catch (error) {
+            estado.textContent = error.message || 'No se pudieron guardar las listas.';
+            estado.className = 'text-danger small mt-3';
+        }
+    });
+})();
+</script>
+{% endblock %}

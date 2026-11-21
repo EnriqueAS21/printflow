@@ -1,0 +1,5 @@
+Paquete PrintFlow
+Generado: 09/11/2026 10:47
+Origen:   /Users/luisenriquearreolasilva/Downloads/PRINTFLOW VERSION 8
+app.py:   2bf8634fecb4
+Migraciones: 8

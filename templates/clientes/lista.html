@@ -1,0 +1,218 @@
+{% extends 'base.html' %}
+
+{% block title %}Área Creativa - Clientes{% endblock %}
+
+{% block styles %}
+{% include 'clientes/_estilos.html' %}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-5 pf-form" style="max-width: 950px;">
+
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <h4 class="mb-0 fw-bold">Clientes</h4>
+        {% if puede('clientes.crear') %}
+        <button type="button" class="btn btn-primary rounded-pill px-4" data-bs-toggle="modal" data-bs-target="#nuevoCliente">
+            + Nuevo cliente
+        </button>
+        {% endif %}
+    </div>
+
+    <div class="form-card">
+        <input type="search" id="buscarCliente" class="form-control" autocomplete="off"
+               placeholder="Buscar por nombre, teléfono o ID" aria-label="Buscar clientes">
+    </div>
+
+    <div class="form-card">
+        <h5 class="section-title" id="tituloTabla">Clientes recientes</h5>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Clave</th>
+                        <th>Nombre</th>
+                        <th>Teléfono</th>
+                        <th>Correo</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="tablaClientes">
+                    {% for c in clientes %}
+                    <tr>
+                        <td class="text-muted">{{ c.clave }}</td>
+                        <td class="fw-semibold">{{ c.nombre }}</td>
+                        <td>
+                            {% if c.whatsapp_url %}
+                            <a href="{{ c.whatsapp_url }}" target="_blank" rel="noopener noreferrer" class="text-decoration-none">
+                                <i class="bi bi-whatsapp text-success me-1"></i>{{ c.telefono }}</a>
+                            {% else %}{{ c.telefono }}{% endif %}
+                        </td>
+                        <td>{{ c.correo or '' }}</td>
+                        <td class="text-end">
+                            <a href="{{ url_for('clientes.ficha', id_cliente=c.id_cliente) }}" class="btn btn-sm btn-outline-primary rounded-pill px-3">Ver</a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="5" class="text-center text-muted py-4">Aún no hay clientes registrados.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {% if puede('clientes.crear') %}
+    <!-- Modal: nuevo cliente -->
+    <div class="modal fade pf-form" id="nuevoCliente" tabindex="-1" aria-labelledby="nuevoClienteTitulo" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <form class="modal-content" id="formNuevoCliente" method="POST" action="{{ url_for('clientes.nuevo') }}">
+                <input type="hidden" name="token_envio" value="{{ token_envio() }}">
+                <div class="modal-header border-0">
+                    <h5 class="modal-title" id="nuevoClienteTitulo">Nuevo cliente</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body pt-0">
+                    <div class="alert alert-warning rounded-4 py-2 d-none" id="errorNuevoCliente" role="alert"></div>
+                    <div class="mb-3">
+                        <label class="form-label small text-muted" for="nc-nombre">Nombre *</label>
+                        <input type="text" class="form-control" id="nc-nombre" name="nombre" maxlength="120" style="text-transform: uppercase" required>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-sm-6">
+                            <label class="form-label small text-muted" for="nc-telefono">Teléfono *</label>
+                            <input type="tel" class="form-control" id="nc-telefono" name="telefono" maxlength="25" required
+                                   inputmode="tel" placeholder="10 dígitos">
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label small text-muted" for="nc-tipo">Tipo</label>
+                            <select class="form-select" id="nc-tipo" name="tipo">
+                                {% for t in tipos %}
+                                <option value="{{ t }}" {% if t == 'Particular' %}selected{% endif %}>{{ t }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small text-muted" for="nc-correo">Correo</label>
+                        <input type="email" class="form-control" id="nc-correo" name="correo" maxlength="120" autocapitalize="off">
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-sm-5">
+                            <label class="form-label small text-muted" for="nc-rfc">RFC</label>
+                            <input type="text" class="form-control text-uppercase" id="nc-rfc" name="rfc" maxlength="13" style="text-transform: uppercase">
+                        </div>
+                        <div class="col-sm-7">
+                            <label class="form-label small text-muted" for="nc-razon">Razón social</label>
+                            <input type="text" class="form-control" id="nc-razon" name="razon_social" maxlength="150" style="text-transform: uppercase">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="form-label small text-muted" for="nc-notas">Notas</label>
+                        <textarea class="form-control" id="nc-notas" name="notas" rows="2" maxlength="2000"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary rounded-pill px-4 fw-semibold">Guardar cliente</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+    const URL_BUSCAR = {{ url_for('clientes.buscar')|tojson }};
+    const input = document.getElementById('buscarCliente');
+    const tbody = document.getElementById('tablaClientes');
+    const titulo = document.getElementById('tituloTabla');
+    const recientesHtml = tbody.innerHTML;   // los 30 recientes que pintó el servidor
+    let temporizador = null;
+    let consulta = 0;
+
+    const escapar = s => String(s ?? '').replace(/[&<>"']/g,
+        c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+    const fila = c => `
+        <tr>
+            <td class="text-muted">${escapar(c.clave)}</td>
+            <td class="fw-semibold">${escapar(c.nombre)}</td>
+            <td>${c.whatsapp_url
+                ? `<a href="${escapar(c.whatsapp_url)}" target="_blank" rel="noopener noreferrer" class="text-decoration-none">
+                       <i class="bi bi-whatsapp text-success me-1"></i>${escapar(c.telefono)}</a>`
+                : escapar(c.telefono)}</td>
+            <td>${escapar(c.correo)}</td>
+            <td class="text-end">
+                <a href="${escapar(c.url_ficha)}" class="btn btn-sm btn-outline-primary rounded-pill px-3">Ver</a>
+            </td>
+        </tr>`;
+
+    const mensaje = texto => `<tr><td colspan="5" class="text-center text-muted py-4">${escapar(texto)}</td></tr>`;
+
+    async function buscar(q) {
+        const id = ++consulta;
+        try {
+            const resp = await fetch(`${URL_BUSCAR}?q=${encodeURIComponent(q)}`,
+                { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+            const datos = await resp.json();
+            if (id !== consulta) return;   // llegó tarde: ya hay otra búsqueda
+            if (!resp.ok) throw new Error(datos.error || 'Error');
+            titulo.textContent = `Resultados (${datos.length})`;
+            tbody.innerHTML = datos.length ? datos.map(fila).join('') : mensaje('Sin coincidencias.');
+        } catch {
+            if (id === consulta) tbody.innerHTML = mensaje('No se pudo buscar. Intenta de nuevo.');
+        }
+    }
+
+    input.addEventListener('input', () => {
+        clearTimeout(temporizador);
+        const q = input.value.trim();
+        if (q.length < 2) {
+            consulta++;   // descarta respuestas pendientes
+            titulo.textContent = 'Clientes recientes';
+            tbody.innerHTML = recientesHtml;
+            return;
+        }
+        temporizador = setTimeout(() => buscar(q), 250);
+    });
+
+    // ---------- Alta de cliente (AJAX) ----------
+    const form = document.getElementById('formNuevoCliente');
+    if (!form) return;
+    const error = document.getElementById('errorNuevoCliente');
+    const boton = form.querySelector('[type=submit]');
+
+    form.addEventListener('submit', async e => {
+        e.preventDefault();   // el manejador global de base.html respeta defaultPrevented
+        if (boton.disabled) return;
+        boton.disabled = true;
+        error.classList.add('d-none');
+        try {
+            const resp = await fetch(form.action, {
+                method: 'POST', body: new FormData(form),
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            });
+            const datos = await resp.json();
+            if (datos.success) {
+                window.location.href = datos.cliente.url_ficha;
+                return;
+            }
+            let html = escapar(datos.error || 'No se pudo guardar el cliente.');
+            if (datos.existente) {
+                html += ` <a href="${escapar(datos.existente.url_ficha)}" class="alert-link">Ver ficha</a>`;
+            }
+            error.innerHTML = html;
+        } catch {
+            error.textContent = 'No se pudo guardar el cliente. Revisa tu conexión e intenta de nuevo.';
+        }
+        error.classList.remove('d-none');
+        boton.disabled = false;
+    });
+
+    document.getElementById('nuevoCliente').addEventListener('shown.bs.modal',
+        () => document.getElementById('nc-nombre').focus());
+})();
+</script>
+{% endblock %}

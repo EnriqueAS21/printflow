@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#1d63ed">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="PrintFlow">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icono-180.png') }}">
+    <title>{% block title %}PrintFlow Manager{% endblock %}</title>
+    <!-- Bootstrap CSS (local) -->
+    <link href="{{ url_for('static', filename='vendor/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="{{ url_for('static', filename='vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='vendor/fonts/fonts.css') }}" rel="stylesheet">
+    <style>
+        :root { --pf-nav: #1d63ed; --pf-navy: #0b2a6f; --pf-tabbar-alto: 64px; }
+
+        /* Modo de interfaz: lo fija pfModo (script del <head>) en <html data-modo="columnas|pestanas">.
+           columnas = barra superior (+ columnas lado a lado en el tablero); pestanas = barra inferior (+ pestañas).
+           Sin data-modo (sin JS) se usa el corte clásico de 992px. */
+        .pf-solo-escritorio, .pf-solo-movil { display: none; }
+        .pf-tabbar.pf-solo-movil { display: none; }   /* más específico que .pf-tabbar { display: flex } */
+        html[data-modo="columnas"] .pf-solo-escritorio { display: block; }
+        html[data-modo="pestanas"] .pf-solo-movil { display: block; }
+        html[data-modo="pestanas"] .pf-tabbar.pf-solo-movil { display: flex; }
+        @media (min-width: 992px) { html:not([data-modo]) .pf-solo-escritorio { display: block; } }
+        @media (max-width: 991.98px) {
+            html:not([data-modo]) .pf-solo-movil { display: block; }
+            html:not([data-modo]) .pf-tabbar.pf-solo-movil { display: flex; }
+        }
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+
+        /* Barra flotante en forma de píldora */
+        .pf-nav-wrap { position: sticky; top: 0; z-index: 1030; padding: .9rem 1.25rem 0; }
+        .pf-nav {
+            max-width: 1280px; margin: 0 auto; padding: .55rem .6rem;
+            background: var(--pf-nav); border-radius: 999px;
+            box-shadow: 0 14px 32px rgba(11, 63, 174, .32);
+            display: flex; flex-wrap: wrap; align-items: center;
+        }
+        .pf-logo {
+            width: 52px; height: 52px; flex-shrink: 0; border-radius: 50%;
+            background: #fff; color: var(--pf-nav); font-size: 1.5rem; text-decoration: none;
+            display: flex; align-items: center; justify-content: center; overflow: hidden;
+        }
+        .pf-logo img { width: 84%; height: 84%; object-fit: contain; }
+        .pf-client { color: #fff; font-weight: 600; font-size: 1.05rem; text-decoration: none; margin: 0 1rem 0 .85rem; }
+        .pf-client:hover { color: #fff; opacity: .9; }
+        .pf-links { gap: .25rem; }
+        .pf-links .nav-link {
+            color: #fff; font-weight: 500; font-size: 1.05rem; padding: .55rem 1.15rem;
+            border-radius: 999px; transition: background .15s;
+        }
+        .pf-links .nav-link:hover { background: rgba(255, 255, 255, .14); color: #fff; }
+        .pf-links .nav-link.active { background: rgba(255, 255, 255, .24); color: #fff; }
+        .pf-links .dropdown-toggle::after { margin-left: .45rem; vertical-align: .15em; }
+        .pf-links .dropdown-menu {
+            border: 0; border-radius: 18px; padding: .5rem; margin-top: .7rem !important;
+            box-shadow: 0 12px 28px rgba(11, 63, 174, .22);
+        }
+        .pf-links .dropdown-item { border-radius: 10px; }
+        .pf-links .dropdown-item.active, .pf-links .dropdown-item:active { background: #e8f0ff; color: var(--pf-navy); }
+        /* Buscador del tablero (centro de la barra) */
+        .pf-buscar { position: relative; flex: 1 1 200px; max-width: 360px; min-width: 0; margin: 0 1rem; }
+        .pf-buscar input {
+            width: 100%; height: 44px; border: 0; border-radius: 999px; outline: none;
+            padding: 0 1.1rem 0 2.8rem; background: #fff; color: var(--pf-navy);
+            box-shadow: 0 2px 8px rgba(11, 63, 174, .18);
+        }
+        .pf-buscar input::placeholder { color: #6c757d; }
+        .pf-buscar input:focus { box-shadow: 0 0 0 3px rgba(255, 255, 255, .45); }
+        .pf-buscar > i { position: absolute; left: 1.1rem; top: 50%; transform: translateY(-50%); color: var(--pf-nav); pointer-events: none; }
+        /* Buscador en móvil: barra superior con lupa que despliega el input */
+        .pf-nav-movil-wrap { position: sticky; top: 0; z-index: 1030; padding: .5rem .5rem 0; }
+        .pf-nav-movil {
+            padding: .4rem .5rem; background: var(--pf-nav); border-radius: 999px;
+            box-shadow: 0 14px 32px rgba(11, 63, 174, .32);
+            display: flex; align-items: center; gap: .6rem;
+        }
+        .pf-nav-movil .pf-logo { width: 40px; height: 40px; font-size: 1.2rem; }
+        .pf-nav-movil .pf-client { margin: 0 auto 0 0; }
+        .pf-buscar-movil-panel { padding-top: .5rem; }
+        .pf-buscar-movil-panel .pf-buscar { max-width: none; margin: 0; }
+        .pf-buscar-movil-panel .pf-buscar input { box-shadow: 0 8px 20px rgba(11, 63, 174, .22); }
+        .pf-user-btn {
+            height: 52px; padding: 0 1.5rem; border: 0; border-radius: 999px;
+            background: #fff; color: var(--pf-navy); font-weight: 500; font-size: 1.02rem;
+            display: inline-flex; align-items: center; gap: .55rem;
+            box-shadow: 0 2px 8px rgba(11, 63, 174, .18);
+        }
+        .pf-user-avatar { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; }
+        .pf-user-initial { width: 30px; height: 30px; border-radius: 50%; background: #e8f0ff; color: var(--pf-navy); display: inline-flex; align-items: center; justify-content: center; font-weight: 700; }
+        .pf-user-btn:hover, .pf-user-btn:focus, .pf-user-btn.show { background: #f3f7ff; color: var(--pf-navy); }
+        .pf-user .dropdown-menu {
+            border: 0; border-radius: 18px; padding: .5rem; margin-top: .7rem !important;
+            box-shadow: 0 12px 28px rgba(11, 63, 174, .22);
+        }
+        .pf-user .dropdown-item { border-radius: 10px; }
+        /* Campana de notificaciones */
+        .pf-acciones { display: flex; align-items: center; gap: .6rem; }
+        .pf-notif-btn {
+            position: relative; width: 52px; height: 52px; flex-shrink: 0; border: 0; border-radius: 50%;
+            background: #fff; color: var(--pf-nav); font-size: 1.35rem;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 2px 8px rgba(11, 63, 174, .18);
+        }
+        .pf-notif-btn:hover, .pf-notif-btn:focus, .pf-notif-btn.show { background: #f3f7ff; color: var(--pf-nav); }
+        .pf-notif-badge { top: 4px; right: 2px; transform: translate(30%, -20%); font-size: .68rem; }
+        .pf-notif .dropdown-menu {
+            width: 340px; max-width: calc(100vw - 2rem);
+            border: 0; border-radius: 18px; padding: .5rem; margin-top: .7rem !important;
+            box-shadow: 0 12px 28px rgba(11, 63, 174, .22);
+        }
+        .pf-notif-lista { max-height: 360px; overflow-y: auto; }
+        .pf-notif .dropdown-item { border-radius: 10px; white-space: normal; display: flex; gap: .65rem; align-items: flex-start; text-align: left; }
+        .pf-notif .dropdown-item.no-leida { background: #eef4ff; }
+        .pf-notif .dropdown-item.no-leida:hover { background: #e2ecff; }
+        .pf-notif-icono { font-size: 1.15rem; line-height: 1.3; }
+        .pf-toggler { margin-left: auto; border: 0; background: transparent; color: #fff; font-size: 1.9rem; line-height: 1; padding: 0 .6rem; }
+        .pf-toggler:focus { box-shadow: none; }
+        @media (max-width: 991.98px) {
+            .pf-nav { border-radius: 999px; }
+            .pf-links { padding: .75rem 0; }
+            .pf-acciones { padding-bottom: .25rem; }
+            .pf-links .nav-link { width: 100%; border-radius: 14px; }
+        }
+        @media (min-width: 992px) and (max-width: 1199.98px) {
+            html[data-modo="columnas"] .pf-user-nombre { display: none; }
+            html[data-modo="columnas"] .pf-user-btn { padding: 0 .55rem; }
+        }
+        html[data-modo="pestanas"] .pf-toasts {
+            top: 72px;
+            bottom: auto;
+        }
+        @media (max-width: 575.98px) {
+            .pf-nav-wrap { padding: .5rem .5rem 0; }
+            .pf-logo { width: 40px; height: 40px; font-size: 1.2rem; }
+            .pf-user-btn { height: 40px; padding: 0 .5rem; }
+            .pf-notif-btn { width: 40px; height: 40px; font-size: 1.2rem; }
+            .pf-client, .pf-user-nombre { display: none; }
+            .pf-nav-movil .pf-client { display: block; font-size: 1rem; }
+            main.py-4 { padding-top: .75rem !important; }
+            input, select, textarea { font-size: 16px; }
+            .btn, .nav-link, .dropdown-item { min-height: 44px; }
+        }
+
+        /* Fondo difuminado para modales y offcanvas */
+        .modal-backdrop.show, .offcanvas-backdrop.show {
+            opacity: 1; background: rgba(15, 23, 42, .35);
+            backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+        }
+
+        /* Barra inferior (solo móvil) */
+        .pf-tabbar {
+            position: fixed; left: max(.75rem, env(safe-area-inset-left)); right: max(.75rem, env(safe-area-inset-right));
+            bottom: calc(.75rem + env(safe-area-inset-bottom)); max-width: 640px; margin: 0 auto;
+            z-index: 1040; height: var(--pf-tabbar-alto); padding: 0 .5rem; border-radius: 999px;
+            background: rgba(29, 99, 237, .82);
+            -webkit-backdrop-filter: blur(14px) saturate(160%); backdrop-filter: blur(14px) saturate(160%);
+            box-shadow: 0 14px 32px rgba(11, 63, 174, .32);
+            display: flex; align-items: center; justify-content: space-around;
+        }
+        .pf-tab {
+            position: relative; min-width: 56px; height: 52px; padding: 0 .75rem; border: 0; border-radius: 999px;
+            background: transparent; color: #fff; text-decoration: none; font-size: .68rem; font-weight: 500; line-height: 1;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .25rem;
+        }
+        .pf-tab i { font-size: 1.4rem; line-height: 1; }
+        .pf-tab:hover, .pf-tab:focus { color: #fff; }
+        .pf-tab.active { background: rgba(255, 255, 255, .22); }
+        .pf-tab .pf-user-avatar, .pf-tab .pf-user-initial { width: 26px; height: 26px; font-size: .8rem; }
+        .pf-tab .pf-notif-badge { top: 6px; right: 12px; }
+
+        /* Notificaciones en modal (móvil) */
+        #pfNotifModal { --bs-modal-margin: .75rem; --bs-modal-width: calc(100vw - 1.5rem); }
+        #pfNotifModal .modal-content { max-height: 80vh; border: 0; border-radius: 24px; }
+        #pfNotifModal .pf-notif-lista { max-height: none; overflow: visible; display: flex; flex-direction: column; gap: .35rem; }
+        #pfNotifModal .modal-header { padding: 1.25rem 1.5rem .75rem; }
+        #pfNotifModal .modal-body { padding: .75rem 1rem 1rem; }
+        #pfNotifModal .modal-footer { padding: .75rem 1.5rem 1rem; }
+        #pfNotifModal .dropdown-item { padding: .8rem 1rem; border-radius: 14px; }
+
+        /* Menú de perfil (móvil) */
+        #pfMenuMovil { height: auto; border-top-left-radius: 24px; border-top-right-radius: 24px; }
+        #pfMenuMovil .list-group-item { border: 0; border-radius: 12px; }
+
+        /* Modales (móvil): tarjeta flotante, cierre visible y botones fijos abajo */
+        @media (max-width: 767.98px) {
+            .modal { --bs-modal-margin: .75rem; }
+            .modal-dialog { margin: .75rem; }
+            .modal .modal-content { max-height: calc(100vh - 7rem); border-radius: 22px; }
+            .modal-dialog:not(.modal-dialog-scrollable) .modal-content { overflow-y: auto; }
+            .modal-header .btn-close { display: block; }
+            .modal-footer {
+                position: sticky; bottom: 0; z-index: 2;
+                display: grid; gap: .5rem; background: var(--bs-modal-bg, #fff);
+            }
+            .modal-footer > * { width: 100%; margin: 0; }
+        }
+        @media (min-width: 576px) and (max-width: 767.98px) {
+            .modal-dialog { margin-inline: auto; }
+        }
+
+        html[data-modo="pestanas"] body { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+        html[data-modo="pestanas"] .pf-toasts, html[data-modo="pestanas"] #avisoColaEtiquetas { bottom: calc(90px + env(safe-area-inset-bottom)) !important; }
+        html[data-modo="pestanas"] #pf-aviso-tablero { top: auto !important; bottom: calc(90px + env(safe-area-inset-bottom)); }
+    </style>
+    {% block styles %}{% endblock %}
+    <script>
+    // pfModo: un único interruptor para navegación (barra superior ↔ inferior) y tablero (columnas ↔ pestañas).
+    // Se evalúa aquí, antes del primer pintado, para que no haya parpadeo. window.PF_COLUMNAS_VISIBLES lo fija la página
+    // (el tablero); sin él solo cuenta el ancho de la navegación.
+    (function () {
+        var raiz = document.documentElement;
+        var ANCHO_NAV = 992;      // la barra superior no cabe por debajo
+        var MIN_COLUMNA = 310;    // ancho útil mínimo de una columna (~320 px)
+        var GUTTER = 24;          // separación entre columnas (g-4)
+        var MARGENES = 56;        // relleno lateral del tablero
+        var HISTERESIS = 24;      // evita saltos por la barra de scroll al llegar justo al límite
+        var columnas = window.PF_COLUMNAS_VISIBLES || 0;
+
+        function calcular(ancho, actual) {
+            if (ancho < ANCHO_NAV) return 'pestanas';
+            if (!columnas) return 'columnas';
+            var necesario = columnas * (MIN_COLUMNA + GUTTER) + MARGENES + (actual === 'pestanas' ? HISTERESIS : 0);
+            return ancho >= necesario ? 'columnas' : 'pestanas';
+        }
+        function actualizar(n) {
+            if (typeof n === 'number') columnas = n;
+            var modo = calcular(raiz.clientWidth, raiz.dataset.modo);
+            if (raiz.dataset.modo === modo) return modo;
+            raiz.dataset.modo = modo;
+            window.dispatchEvent(new CustomEvent('pfmodo', { detail: modo }));
+            return modo;
+        }
+        // Solo al cargar y al redimensionar se reevalúa el modo. La sincronización del tablero NUNCA lo cambia:
+        // las columnas que aparecen o desaparecen después no mueven la interfaz de columnas a pestañas ni al revés.
+        // La página puede registrar una fuente (fuenteColumnas) que cuenta las columnas visibles en ese momento.
+        var fuente = null;
+        function reevaluar() { return actualizar(fuente ? fuente() : undefined); }
+        window.pfModo = {
+            actual: function () { return raiz.dataset.modo; },
+            fuenteColumnas: function (fn) { fuente = fn; },
+        };
+        actualizar();
+        document.addEventListener('DOMContentLoaded', function () {
+            window.addEventListener('resize', reevaluar);
+            var contenedor = document.querySelector('main');
+            if ('ResizeObserver' in window && contenedor) new ResizeObserver(reevaluar).observe(contenedor);
+        });
+    })();
+    </script>
+</head>
+<body class="bg-light" data-blueprint="{{ request.blueprint or '' }}"{% if version_tablero is defined %} data-version-tablero="{{ version_tablero }}"{% endif %}{% if config.get('DEBUG') or config.get('JS_DEBUG') %} data-debug="1"{% endif %}>
+
+    <!-- Barra de navegación superior unificada -->
+    <header class="pf-nav-wrap pf-solo-escritorio">
+        <nav class="pf-nav navbar navbar-expand-lg">
+            <a class="pf-logo" href="{{ url_for('dashboard.index') }}" title="PrintFlow Manager"><img src="{{ url_for('static', filename='icono-180.png') }}" alt="Logo"></a>
+            <a class="pf-client" href="{{ url_for('dashboard.index') }}">{{ config.get('NOMBRE_CLIENTE', 'Área Creativa') }}</a>
+
+            {% if request.endpoint == 'dashboard.index' %}
+            <div class="pf-buscar mx-auto">
+                <i class="bi bi-search"></i>
+                <input type="search" id="buscadorGeneral" placeholder="Folio, cliente o teléfono" autocomplete="off" aria-label="Buscar en el tablero">
+            </div>
+            {% endif %}
+
+            <button class="navbar-toggler pf-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-label="Menú">
+                <i class="bi bi-list"></i>
+            </button>
+
+            <div class="collapse navbar-collapse" id="navbarNav">
+                {% set es_admin = usuario_actual and usuario_actual.rol == 'Administrador' %}
+                {% set ver_usuarios = puede('usuarios.administrar') %}
+                {% set ver_bitacora = ver_usuarios and puede('bitacora.ver') %}
+                {% set ver_nota = ver_usuarios and modulo_activo('configuracion') %}
+                {% set ver_reportes = puede('reportes.ver') %}
+                {% set ver_productos = puede('productos.ver') %}
+                {% set ver_stickers = puede('stickers.usar') %}
+                {% set mostrar_admin = es_admin and (ver_usuarios or ver_bitacora or ver_nota or ver_reportes or ver_productos or ver_stickers) %}
+                {% set en_tablero = request.blueprint == 'dashboard' %}
+
+                {% if en_tablero and request.endpoint != 'dashboard.index' %}
+                <div class="pf-buscar mx-auto">
+                    <i class="bi bi-search"></i>
+                    <input type="search" id="buscadorGeneral" placeholder="Folio, cliente o teléfono" autocomplete="off" aria-label="Buscar en el tablero">
+                </div>
+                {% endif %}
+
+                <ul class="navbar-nav pf-links{% if not en_tablero or request.endpoint == 'dashboard.index' %} mx-auto{% else %} ms-2{% endif %}">
+                    <li class="nav-item"><a class="nav-link {% if request.blueprint == 'dashboard' %}active{% endif %}" href="{{ url_for('dashboard.index') }}">Tablero</a></li>
+                    {% if puede('clientes.ver') %}
+                    <li class="nav-item"><a class="nav-link {% if request.blueprint == 'clientes' %}active{% endif %}" href="{{ url_for('clientes.lista') }}">Clientes</a></li>
+                    {% endif %}
+                    {% if puede('caja.ver') %}
+                    <li class="nav-item"><a class="nav-link {% if request.blueprint == 'caja' %}active{% endif %}" href="{{ url_for('caja.index') }}">Caja</a></li>
+                    {% endif %}
+                    {% if not es_admin and ver_productos %}
+                    <li class="nav-item"><a class="nav-link {% if request.blueprint == 'productos' %}active{% endif %}" href="{{ url_for('productos.lista') }}">Productos</a></li>
+                    {% endif %}
+                    {% if not es_admin and ver_stickers %}
+                    <li class="nav-item"><a class="nav-link {% if request.blueprint == 'stickers' %}active{% endif %}" href="{{ url_for('stickers.index') }}">Stickers</a></li>
+                    {% endif %}
+                    {% if mostrar_admin %}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle {% if request.blueprint in ('usuarios', 'bitacora', 'configuracion', 'reportes', 'productos', 'stickers') %}active{% endif %}"
+                           href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">Admin</a>
+                        <ul class="dropdown-menu">
+                            {% if ver_usuarios %}
+                            <li><a class="dropdown-item {% if request.blueprint == 'usuarios' %}active{% endif %}" href="{{ url_for('usuarios.lista') }}">Usuarios</a></li>
+                            {% endif %}
+                            {% if ver_bitacora %}
+                            <li><a class="dropdown-item {% if request.blueprint == 'bitacora' %}active{% endif %}" href="{{ url_for('bitacora.index') }}">Bitácora</a></li>
+                            {% endif %}
+                            {% if ver_nota %}
+                            <li><a class="dropdown-item {% if request.blueprint == 'configuracion' %}active{% endif %}" href="{{ url_for('configuracion.nota') }}">Diseño Nota</a></li>
+                            {% endif %}
+                            {% if ver_reportes %}
+                            <li><a class="dropdown-item {% if request.blueprint == 'reportes' %}active{% endif %}" href="{{ url_for('reportes.index') }}">Reportes</a></li>
+                            {% endif %}
+                            {% if ver_productos %}
+                            <li><a class="dropdown-item {% if request.blueprint == 'productos' %}active{% endif %}" href="{{ url_for('productos.lista') }}">Productos</a></li>
+                            {% endif %}
+                            {% if ver_stickers %}
+                            <li><a class="dropdown-item {% if request.blueprint == 'stickers' %}active{% endif %}" href="{{ url_for('stickers.index') }}">Stickers</a></li>
+                            {% endif %}
+                        </ul>
+                    </li>
+                    {% endif %}
+                </ul>
+
+                
+
+                <div class="pf-acciones">
+                {% if usuario_actual %}
+                <div class="dropdown pf-notif">
+                    <button class="pf-notif-btn" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside"
+                            aria-expanded="false" title="Notificaciones">
+                        <i class="bi bi-bell-fill"></i>
+                        <span class="position-absolute badge rounded-pill bg-danger pf-notif-badge d-none">0</span>
+                    </button>
+                    <div class="dropdown-menu dropdown-menu-end">
+                        <div class="d-flex align-items-center justify-content-between px-2 pb-2">
+                            <strong>Notificaciones</strong>
+                            <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none pf-notif-leer-todas">Marcar todas como leídas</button>
+                        </div>
+                        <div class="pf-notif-lista">
+                            <div class="text-muted small text-center py-3">Cargando…</div>
+                        </div>
+                        <hr class="dropdown-divider">
+                        <a class="dropdown-item justify-content-center small" href="{{ url_for('notificaciones.lista') }}">Ver todas</a>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="dropdown pf-user">
+                    <button class="pf-user-btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        {% if foto_perfil_actual %}
+                        <img class="pf-user-avatar" src="{{ url_for('static', filename='uploads/perfiles/' ~ foto_perfil_actual) }}" alt="Foto de perfil">
+                        {% else %}
+                        <span class="pf-user-initial">{{ usuario_actual.nombre[:1]|upper if usuario_actual else '?' }}</span>
+                        {% endif %}
+                        <span class="pf-user-nombre">{{ usuario_actual.nombre if usuario_actual else 'Usuario' }}</span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><span class="dropdown-item-text small text-muted">{{ usuario_actual.rol if usuario_actual else '' }}</span></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="{{ url_for('usuarios.perfil') }}"><i class="bi bi-person-gear me-2"></i>Mi perfil</a></li>
+                        <li>
+                            <form action="{{ url_for('autenticacion.logout') }}" method="POST" class="m-0">
+                                <button type="submit" class="dropdown-item text-danger">Cerrar Sesión</button>
+                            </form>
+                        </li>
+                    </ul>
+                </div>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    {% if request.blueprint == 'dashboard' %}
+    <!-- Barra superior con buscador (solo móvil, solo tablero) -->
+    <div class="pf-nav-movil-wrap pf-solo-movil">
+        <div class="pf-nav-movil">
+            <a class="pf-logo" href="{{ url_for('dashboard.index') }}" title="PrintFlow Manager"><img src="{{ url_for('static', filename='icono-180.png') }}" alt="Logo"></a>
+            <a class="pf-client" href="{{ url_for('dashboard.index') }}">{{ config.get('NOMBRE_CLIENTE', 'Área Creativa') }}</a>
+            <button class="pf-notif-btn" type="button" id="pfBuscarMovilBtn" data-bs-toggle="collapse" data-bs-target="#pfBuscarMovil"
+                    aria-expanded="false" aria-controls="pfBuscarMovil" aria-label="Buscar" style="width:40px;height:40px;font-size:1.2rem;">
+                <i class="bi bi-search"></i>
+            </button>
+        </div>
+        <div class="collapse pf-buscar-movil-panel" id="pfBuscarMovil">
+            <div class="pf-buscar">
+                <i class="bi bi-search"></i>
+                <input type="search" id="buscadorMovil" placeholder="Folio, cliente o teléfono" autocomplete="off" aria-label="Buscar en el tablero">
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Barra inferior (solo móvil) -->
+    <nav class="pf-tabbar pf-solo-movil" aria-label="Navegación principal">
+        <a class="pf-tab {% if request.blueprint == 'dashboard' %}active{% endif %}" href="{{ url_for('dashboard.index') }}">
+            <i class="bi bi-grid-1x2-fill"></i><span>Tablero</span>
+        </a>
+        {% if puede('clientes.ver') %}
+        <a class="pf-tab {% if request.blueprint == 'clientes' %}active{% endif %}" href="{{ url_for('clientes.lista') }}">
+            <i class="bi bi-people-fill"></i><span>Clientes</span>
+        </a>
+        {% endif %}
+        {% if puede('caja.ver') %}
+        <a class="pf-tab {% if request.blueprint == 'caja' %}active{% endif %}" href="{{ url_for('caja.index') }}">
+            <i class="bi bi-cash-stack"></i><span>Caja</span>
+        </a>
+        {% endif %}
+        {% if puede('reportes.ver') %}
+        <a class="pf-tab {% if request.blueprint == 'reportes' %}active{% endif %}" href="{{ url_for('reportes.index') }}">
+            <i class="bi bi-bar-chart-fill"></i><span>Reportes</span>
+        </a>
+        {% endif %}
+        {% if usuario_actual %}
+        <button class="pf-tab" type="button" data-bs-toggle="modal" data-bs-target="#pfNotifModal">
+            <i class="bi bi-bell-fill"></i><span>Avisos</span>
+            <span class="position-absolute badge rounded-pill bg-danger pf-notif-badge d-none">0</span>
+        </button>
+        {% endif %}
+        <button class="pf-tab {% if request.blueprint in ('usuarios', 'bitacora', 'configuracion') %}active{% endif %}" type="button"
+                data-bs-toggle="offcanvas" data-bs-target="#pfMenuMovil" aria-controls="pfMenuMovil">
+            {% if foto_perfil_actual %}
+            <img class="pf-user-avatar" src="{{ url_for('static', filename='uploads/perfiles/' ~ foto_perfil_actual) }}" alt="Foto de perfil">
+            {% else %}
+            <span class="pf-user-initial">{{ usuario_actual.nombre[:1]|upper if usuario_actual else '?' }}</span>
+            {% endif %}
+            <span>Perfil</span>
+        </button>
+    </nav>
+
+    {% if usuario_actual %}
+    <!-- Notificaciones (móvil) -->
+    <div class="modal fade pf-notif" id="pfNotifModal" tabindex="-1" aria-labelledby="pfNotifModalTitulo" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="pfNotifModalTitulo">Notificaciones</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="px-4 pt-1 text-end">
+                    <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none pf-notif-leer-todas">Marcar todas como leídas</button>
+                </div>
+                <div class="modal-body">
+                    <div class="pf-notif-lista">
+                        <div class="text-muted small text-center py-3">Cargando…</div>
+                    </div>
+                </div>
+                <div class="modal-footer justify-content-center">
+                    <a class="btn btn-link text-decoration-none" href="{{ url_for('notificaciones.lista') }}">Ver todas</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Menú de perfil (móvil) -->
+    <div class="offcanvas offcanvas-bottom" tabindex="-1" id="pfMenuMovil" aria-labelledby="pfMenuMovilTitulo">
+        <div class="offcanvas-header">
+            <div>
+                <h5 class="offcanvas-title mb-0" id="pfMenuMovilTitulo">{{ usuario_actual.nombre if usuario_actual else 'Usuario' }}</h5>
+                <small class="text-muted">{{ usuario_actual.rol if usuario_actual else '' }}</small>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Cerrar"></button>
+        </div>
+        <div class="offcanvas-body pt-0">
+            <div class="list-group list-group-flush">
+                <a class="list-group-item list-group-item-action" href="{{ url_for('usuarios.perfil') }}"><i class="bi bi-person-gear me-2"></i>Mi perfil</a>
+                {% if not es_admin and ver_productos %}
+                <a class="list-group-item list-group-item-action" href="{{ url_for('productos.lista') }}"><i class="bi bi-box-seam me-2"></i>Productos</a>
+                {% endif %}
+                {% if not es_admin and ver_stickers %}
+                <a class="list-group-item list-group-item-action" href="{{ url_for('stickers.index') }}"><i class="bi bi-emoji-smile me-2"></i>Stickers</a>
+                {% endif %}
+                {% if mostrar_admin %}
+                <div class="list-group-item small text-muted text-uppercase fw-semibold border-0 pb-0">Admin</div>
+                {% if ver_usuarios %}
+                <a class="list-group-item list-group-item-action" href="{{ url_for('usuarios.lista') }}"><i class="bi bi-people me-2"></i>Usuarios</a>
+                {% endif %}
+                {% if ver_bitacora %}
+                <a class="list-group-item list-group-item-action" href="{{ url_for('bitacora.index') }}"><i class="bi bi-journal-text me-2"></i>Bitácora</a>
+                {% endif %}
+                {% if ver_nota %}
+                <a class="list-group-item list-group-item-action" href="{{ url_for('configuracion.nota') }}"><i class="bi bi-receipt me-2"></i>Diseño Nota</a>
+                {% endif %}
+                {% if ver_reportes %}
+                <a class="list-group-item list-group-item-action" href="{{ url_for('reportes.index') }}"><i class="bi bi-bar-chart-fill me-2"></i>Reportes</a>
+                {% endif %}
+                {% if ver_productos %}
+                <a class="list-group-item list-group-item-action" href="{{ url_for('productos.lista') }}"><i class="bi bi-box-seam me-2"></i>Productos</a>
+                {% endif %}
+                {% if ver_stickers %}
+                <a class="list-group-item list-group-item-action" href="{{ url_for('stickers.index') }}"><i class="bi bi-emoji-smile me-2"></i>Stickers</a>
+                {% endif %}
+                {% endif %}
+                <form action="{{ url_for('autenticacion.logout') }}" method="POST" class="m-0">
+                    <button type="submit" class="list-group-item list-group-item-action text-danger"><i class="bi bi-box-arrow-right me-2"></i>Cerrar Sesión</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contenedor dinámico -->
+    <main class="py-4">
+        <!-- Mensajes Flash -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <div class="container-fluid px-3">
+              <div style="max-width: 1150px; margin: 0 auto 1rem auto;">
+                {% for category, message in messages %}
+                  <div class="alert alert-{{ category }} alert-dismissible fade show rounded-4" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+                  </div>
+                {% endfor %}
+              </div>
+            </div>
+          {% endif %}
+        {% endwith %}
+
+        {% block content %}
+        {% endblock %}
+    </main>
+
+    {% if puede('etiquetas.imprimir') or puede('pedidos.gestionar') %}
+    <!-- Aviso de cola de etiquetas pausada -->
+    <div id="avisoColaEtiquetas" class="card border-danger shadow position-fixed bottom-0 end-0 m-3 d-none"
+         style="z-index: 1080; max-width: 360px;" role="alert" aria-live="assertive">
+        <div class="card-body">
+            <h6 class="card-title text-danger mb-2"><i class="bi bi-exclamation-triangle-fill me-1"></i>Cola de etiquetas pausada</h6>
+            <p class="card-text small mb-1">Falló la etiqueta de <strong id="avisoColaFolio"></strong>.</p>
+            <p class="card-text small text-muted mb-3" id="avisoColaMensaje"></p>
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-sm btn-danger" id="avisoColaReintentar">Reintentar</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="avisoColaDescartar">Ya salió, continuar</button>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% include '_modal_efectivo.html' %}
+
+    <script>
+    // Modo DEBUG (entorno de desarrollo, app en debug, o localStorage.pfDebug = '1' en la consola del navegador):
+    // cuenta cuántas veces corre cada tarea periódica del tablero y lo imprime cada minuto.
+    // Uso en el código: window.pfContar?.('nombre'). Sin DEBUG es una función que no existe (no cuesta nada).
+    (function () {
+        let activo = document.body.dataset.debug === '1';
+        try { activo = activo || localStorage.getItem('pfDebug') === '1'; } catch (e) { /* sin almacenamiento */ }
+        if (!activo) return;
+        let cuentas = {};
+        window.pfContar = nombre => { cuentas[nombre] = (cuentas[nombre] || 0) + 1; };
+        window.pfContadores = () => ({ ...cuentas });
+        setInterval(() => {
+            if (Object.keys(cuentas).length) console.info('[PrintFlow DEBUG] llamadas en el último minuto', cuentas);
+            cuentas = {};
+        }, 60000);
+        console.info('[PrintFlow DEBUG] contadores activos: se imprimen cada 60 s (window.pfContadores() los muestra al instante)');
+    })();
+    </script>
+
+    <!-- Bootstrap JS Bundle (local) -->
+    <script src="{{ url_for('static', filename='vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/modal_efectivo.js') }}"></script>
+    {% set id_cliente_completar = session.pop('cliente_por_completar', None) %}
+    {% set cliente_completar = obtener_cliente(id_cliente_completar) if id_cliente_completar and puede('clientes.crear') else none %}
+    {% if cliente_completar %}
+    {% with cliente = cliente_completar %}{% include 'clientes/_modal_completar.html' %}{% endwith %}
+    <script>
+    // Cliente recién creado desde un pedido: ofrecer completar sus datos.
+    // Si otro modal está abierto (p. ej. el de impresión), espera a que se cierre.
+    (() => {
+        const modal = document.getElementById('completarCliente-{{ cliente_completar.id_cliente }}');
+        const form = modal.querySelector('form');
+
+        window.addEventListener('load', () => setTimeout(function abrir() {
+            const otro = document.querySelector('.modal.show');
+            if (otro) {
+                otro.addEventListener('hidden.bs.modal', () => setTimeout(abrir, 150), { once: true });
+                return;
+            }
+            bootstrap.Modal.getOrCreateInstance(modal).show();
+        }, 300));
+
+        // Guardar sin salir de la pantalla actual (caja / tablero).
+        form.addEventListener('submit', async e => {
+            e.preventDefault();
+            const boton = form.querySelector('[type=submit]');
+            boton.disabled = true;
+            try {
+                const resp = await fetch(form.action, {
+                    method: 'POST', body: new FormData(form),
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                });
+                const datos = await resp.json();
+                if (!datos.success) throw new Error(datos.error);
+                bootstrap.Modal.getOrCreateInstance(modal).hide();
+            } catch (err) {
+                alert(err.message || 'No se pudieron guardar los datos del cliente.');
+                boton.disabled = false;
+            }
+        });
+    })();
+    </script>
+    {% endif %}
+    <script>
+    document.addEventListener('submit', e => {
+    const form = e.target;
+    if (e.defaultPrevented) return;              // p. ej. confirm() cancelado
+    if (form.dataset.enviando) { e.preventDefault(); return; }
+    form.dataset.enviando = '1';
+    // setTimeout para que el navegador alcance a mandar el botón pulsado
+    setTimeout(() => form.querySelectorAll('[type=submit]').forEach(b => b.disabled = true), 0);
+    });
+    // Si el usuario regresa con "Atrás", reactivar los formularios
+    window.addEventListener('pageshow', e => {
+    if (!e.persisted) return;
+    document.querySelectorAll('form').forEach(f => {
+        delete f.dataset.enviando;
+        f.querySelectorAll('[type=submit]').forEach(b => b.disabled = false);
+    });
+    });
+    </script>
+    {% if usuario_actual %}
+    <div class="toast-container pf-toasts position-fixed bottom-0 end-0 p-3" style="z-index: 1090;">
+        <div id="pf-notif-toast" class="toast" role="status" aria-live="polite" aria-atomic="true">
+            <div class="toast-header">
+                <i class="bi bi-bell-fill me-2" style="color: var(--pf-nav);"></i>
+                <strong class="me-auto">Nueva notificación</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Cerrar"></button>
+            </div>
+            <div class="toast-body" id="pf-notif-toast-texto"></div>
+        </div>
+    </div>
+    <div id="pf-aviso-tablero" class="alert alert-primary shadow position-fixed start-50 translate-middle-x py-2 mb-0 d-none"
+         style="z-index: 1029; width: min(640px, calc(100% - 2rem));" role="status" aria-live="polite">
+        <div class="d-flex align-items-center justify-content-between gap-3">
+            <span><i class="bi bi-arrow-repeat me-2"></i>Hay pedidos actualizados</span>
+            <button type="button" class="btn btn-sm btn-primary" id="pf-aviso-tablero-btn">Actualizar</button>
+        </div>
+    </div>
+    <script>
+    (function () {
+        const badges = document.querySelectorAll('.pf-notif-badge');
+        const listas = document.querySelectorAll('.pf-notif-lista');
+        const botonesLeerTodas = document.querySelectorAll('.pf-notif-leer-todas');
+        const urlResumen = "{{ url_for('notificaciones.resumen') }}";
+        const urlLeerTodas = "{{ url_for('notificaciones.leer_todas') }}";
+        const tituloBase = document.title.replace(/^\(\d+\+?\)\s/, '');
+        let anterior = null;   // no_leidas de la consulta previa (null = primera carga)
+
+        // ---- Cambios en el tablero (version_tablero) ----
+        const enTablero = document.body.dataset.blueprint === 'dashboard';
+        const avisoTablero = document.getElementById('pf-aviso-tablero');
+        const CLAVE_TABLERO = 'pf-tablero-estado';
+        // Versión con la que se renderizó la página (si la ruta la envía); si no, la primera de /resumen
+        const versionRender = parseInt(document.body.dataset.versionTablero, 10);
+        let versionInicial = Number.isNaN(versionRender) ? null : versionRender;
+        let hayPendientes = false;
+        let ultimaInteraccion = 0;
+        let revisionPeriodica = null;
+
+        ['keydown', 'pointerdown', 'input'].forEach(tipo => document.addEventListener(tipo, e => {
+            if (e.isTrusted) ultimaInteraccion = Date.now();
+        }, true));
+
+        function estaSegura() {
+            if (!enTablero) return false;
+            if (document.querySelector('.modal.show, .offcanvas.show, .dropdown-menu.show,.card-extra.show, .card-extra.collapsing')) return false;
+            const activo = document.activeElement;
+            if (activo && activo.matches('input, textarea, select')) return false;
+            return Date.now() - ultimaInteraccion >= 15000;
+        }
+
+        function recargarTablero() {
+            const buscador = document.getElementById('buscadorGeneral');
+            sessionStorage.setItem(CLAVE_TABLERO, JSON.stringify({
+                scrollY: window.scrollY,
+                busqueda: buscador ? buscador.value : '',
+            }));
+            history.scrollRestoration = 'manual';
+            location.reload();
+        }
+
+        function mostrarAvisoTablero() {
+            const nav = document.querySelector('.pf-nav-wrap');
+            avisoTablero.style.top = `${(nav ? nav.getBoundingClientRect().bottom : 0) + 8}px`;
+            avisoTablero.classList.remove('d-none');
+            if (enTablero && !revisionPeriodica) revisionPeriodica = setInterval(evaluarPendientes, 5000);
+        }
+
+        function evaluarPendientes() {
+            if (!hayPendientes || document.hidden) return;
+            if (estaSegura()) recargarTablero();
+            else mostrarAvisoTablero();
+        }
+
+        function revisarVersionTablero(version) {
+            if (enTablero || typeof version !== 'number') return;   // el tablero usa tablero_sync.js
+            if (versionInicial === null) { versionInicial = version; return; }
+            if (version > versionInicial) { hayPendientes = true; evaluarPendientes(); }
+        }
+
+        // Para tablero_sync.js: recarga con recargarTablero en cuanto no interrumpa al usuario.
+        window.pedirRecargaTablero = () => { hayPendientes = true; evaluarPendientes(); };
+
+        document.getElementById('pf-aviso-tablero-btn').addEventListener('click', () => {
+            if (enTablero) recargarTablero(); else location.reload();
+        });
+
+        // Al volver de una recarga automática, restaurar buscador y scroll
+        const estadoGuardado = enTablero && sessionStorage.getItem(CLAVE_TABLERO);
+        if (estadoGuardado) {
+            sessionStorage.removeItem(CLAVE_TABLERO);
+            document.addEventListener('DOMContentLoaded', () => setTimeout(() => {
+                try {
+                    const estado = JSON.parse(estadoGuardado);
+                    const buscador = document.getElementById('buscadorGeneral');
+                    if (buscador && estado.busqueda) {
+                        buscador.value = estado.busqueda;
+                        buscador.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                    window.scrollTo(0, Number(estado.scrollY) || 0);
+                } catch (e) { /* estado corrupto: se ignora */ }
+                history.scrollRestoration = 'auto';
+            }, 0));
+        }
+
+        function escapar(texto) {
+            return String(texto ?? '').replace(/[&<>"']/g, c => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+            })[c]);
+        }
+
+        function pintar(recientes) {
+            const html = !recientes.length
+                ? '<div class="text-muted small text-center py-3">Sin notificaciones</div>'
+                : recientes.map(n => `
+                <form method="POST" action="/notificaciones/${Number(n.id)}/abrir" class="m-0">
+                    <button type="submit" class="dropdown-item${n.leida ? '' : ' no-leida'}">
+                        <i class="bi ${escapar(n.icono)} text-${escapar(n.color)} pf-notif-icono"></i>
+                        <span class="flex-grow-1">
+                            <span class="d-block fw-bold">${escapar(n.titulo)}</span>
+                            <span class="d-block small">${escapar(n.mensaje)}</span>
+                            <span class="d-block small text-muted">${escapar(n.hace)}</span>
+                        </span>
+                    </button>
+                </form>`).join('');
+            listas.forEach(lista => { lista.innerHTML = html; });
+        }
+
+        function mostrarToast(n) {
+            if (!n) return;
+            document.getElementById('pf-notif-toast-texto').textContent = n.titulo;
+            if (document.documentElement.dataset.modo === 'pestanas') {
+                const navMovil = document.querySelector('.pf-nav-movil-wrap');
+                const nav = document.querySelector('.pf-nav-wrap');
+                const contenedorToast = document.querySelector('.pf-toasts');
+                const base = navMovil && navMovil.offsetParent ? navMovil : nav;
+                const inferior = base ? base.getBoundingClientRect().bottom : 72;
+                contenedorToast.style.top = `${inferior + 8}px`;
+                contenedorToast.style.bottom = 'auto';
+            } else {
+                const contenedorToast = document.querySelector('.pf-toasts');
+                contenedorToast.style.top = '';
+                contenedorToast.style.bottom = '';
+            }
+            bootstrap.Toast.getOrCreateInstance(document.getElementById('pf-notif-toast')).show();
+        }
+
+        async function cargarNotificaciones() {
+            try {
+                const r = await fetch(urlResumen, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                if (!r.ok) return;
+                const d = await r.json();
+                const n = d.no_leidas || 0;
+                const recientes = d.recientes || [];
+
+                badges.forEach(badge => {
+                    badge.textContent = n > 9 ? '9+' : n;
+                    badge.classList.toggle('d-none', n === 0);
+                });
+                document.title = n > 0 ? `(${n}) ${tituloBase}` : tituloBase;
+                pintar(recientes);
+
+                if (anterior !== null && n > anterior) mostrarToast(recientes[0]);
+                anterior = n;
+                revisarVersionTablero(d.version_tablero);
+            } catch (e) { /* sin conexión: se reintenta en el siguiente ciclo */ }
+        }
+
+        botonesLeerTodas.forEach(btn => btn.addEventListener('click', async () => {
+            botonesLeerTodas.forEach(b => { b.disabled = true; });
+            try {
+                await fetch(urlLeerTodas, { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+            } catch (e) { /* se refleja en la siguiente consulta */ }
+            botonesLeerTodas.forEach(b => { b.disabled = false; });
+            cargarNotificaciones();
+        }));
+
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) { cargarNotificaciones(); evaluarPendientes(); }
+        });
+        setInterval(() => { if (!document.hidden) cargarNotificaciones(); }, 30000);
+        cargarNotificaciones();
+    })();
+    </script>
+    {% endif %}
+    {% if puede('etiquetas.imprimir') or puede('pedidos.gestionar') %}
+    <script>
+    (function () {
+        const aviso = document.getElementById('avisoColaEtiquetas');
+        const btnReintentar = document.getElementById('avisoColaReintentar');
+        const btnDescartar = document.getElementById('avisoColaDescartar');
+        const urlCola = "{{ url_for('pedidos.consultar_cola_etiquetas') }}";
+        const urlReintentar = "{{ url_for('pedidos.reintentar_cola_etiquetas') }}";
+        const urlDescartar = "{{ url_for('pedidos.descartar_cola_etiquetas') }}";
+        const cabeceras = { 'X-Requested-With': 'XMLHttpRequest' };
+
+        async function consultarCola() {
+            try {
+                const r = await fetch(urlCola, { headers: cabeceras });
+                if (!r.ok) return;
+                const d = await r.json();
+                const cola = d.cola || {};
+                if (cola.pausada) {
+                    const fallido = cola.fallido || {};
+                    document.getElementById('avisoColaFolio').textContent = fallido.folio || '—';
+                    document.getElementById('avisoColaMensaje').textContent = fallido.mensaje || 'Error desconocido.';
+                    aviso.classList.remove('d-none');
+                } else {
+                    aviso.classList.add('d-none');
+                }
+            } catch (e) { /* sin conexión: se reintenta en el siguiente ciclo */ }
+        }
+
+        async function accion(url) {
+            btnReintentar.disabled = btnDescartar.disabled = true;
+            try {
+                await fetch(url, { method: 'POST', headers: cabeceras });
+            } catch (e) { /* se refleja en la siguiente consulta */ }
+            btnReintentar.disabled = btnDescartar.disabled = false;
+            consultarCola();
+        }
+
+        btnReintentar.addEventListener('click', () => accion(urlReintentar));
+        btnDescartar.addEventListener('click', () => accion(urlDescartar));
+        consultarCola();
+        // Casi no se usa: cada 30 s, y nunca con la pestaña oculta; al volver a verse se consulta de inmediato.
+        setInterval(() => { if (!document.hidden) consultarCola(); }, 30000);
+        document.addEventListener('visibilitychange', () => { if (!document.hidden) consultarCola(); });
+    })();
+    </script>
+    {% endif %}
+    {% set id_pedido_descarga = session.pop('descargar_pdf', none) %}
+    {% if id_pedido_descarga %}
+    <span id="auto-descargar-pdf" hidden
+          data-url="{{ url_for('pedidos.descargar_ticket_pdf', id_pedido=id_pedido_descarga) }}"></span>
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const enlace = document.createElement('a');
+        enlace.href = document.getElementById('auto-descargar-pdf').dataset.url;
+        enlace.style.display = 'none';
+        document.body.appendChild(enlace);
+        enlace.click();
+        enlace.remove();
+    });
+    </script>
+    {% endif %}
+    {% if request.blueprint == 'dashboard' %}
+    <script>
+    // Buscador móvil: es un espejo del input del tablero (#buscadorGeneral), que conserva toda la lógica.
+    (function () {
+        const principal = document.getElementById('buscadorGeneral');
+        const movil = document.getElementById('buscadorMovil');
+        const panel = document.getElementById('pfBuscarMovil');
+        if (!principal || !movil || !panel) return;
+        movil.addEventListener('input', () => {
+            principal.value = movil.value;
+            principal.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+        // Principal → móvil solo copia el valor (sin disparar eventos) y solo si difiere: no hay rebote.
+        principal.addEventListener('input', () => { if (movil.value !== principal.value) movil.value = principal.value; });
+        panel.addEventListener('shown.bs.collapse', () => movil.focus());
+        // Si ya hay texto (p. ej. tras una recarga automática), mostrar el panel abierto.
+        principal.addEventListener('input', () => {
+            if (principal.value && !panel.classList.contains('show')) bootstrap.Collapse.getOrCreateInstance(panel).show();
+        });
+    })();
+    </script>
+    {% endif %}
+    {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,309 @@
+{% extends 'base.html' %}
+{% block title %}Configuración de nota PDF{% endblock %}
+
+{% block styles %}
+<style>
+  .nota-panel { border: 0; border-radius: 1.25rem; box-shadow: 0 10px 28px rgba(23, 67, 107, .08); }
+  .nota-label { color: #17436B; font-weight: 650; }
+  .nota-control { border-radius: .8rem; padding: .75rem 1rem; }
+  .logo-preview { max-width: 220px; max-height: 120px; object-fit: contain; border: 1px dashed #b8d8f5; border-radius: 1rem; padding: .75rem; background: #f5faff; }
+  .policy-help { color: #61758a; }
+  .apartado-card { border: 1px solid #d6e8f8; border-radius: 1rem; background: #f8fbff; }
+  .apartado-bloque { border-left: 3px solid #61ADFF; padding-left: .75rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 980px;">
+  <div class="mb-4">
+    <h1 class="h3 fw-bold mb-1" style="color:#17436B;">Diseño de la nota</h1>
+    <p class="text-muted mb-0">Edita los datos del negocio y las políticas que aparecen en las notas PDF.</p>
+  </div>
+
+  <form method="POST" enctype="multipart/form-data" class="card nota-panel">
+    <div class="card-body p-4 p-md-5">
+      <h2 class="h5 fw-bold mb-4"><i class="bi bi-shop me-2" style="color:#61ADFF;"></i>Datos de la sucursal</h2>
+      <div class="row g-3">
+        <div class="col-md-8">
+          <label class="form-label nota-label" for="nombre_negocio">Nombre del negocio</label>
+          <input class="form-control nota-control" id="nombre_negocio" name="nombre_negocio" maxlength="120" required
+                 value="{{ request.form.get('nombre_negocio', configuracion.nombre_negocio) }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label nota-label" for="telefono">Teléfono</label>
+          <input class="form-control nota-control" id="telefono" name="telefono" maxlength="40" required
+                 value="{{ request.form.get('telefono', configuracion.telefono) }}">
+        </div>
+        <div class="col-12">
+          <label class="form-label nota-label" for="lema">Lema <span class="text-muted fw-normal">(opcional)</span></label>
+          <input class="form-control nota-control" id="lema" name="lema" maxlength="160"
+                 value="{{ request.form.get('lema', configuracion.lema) }}">
+        </div>
+        <div class="col-12">
+          <label class="form-label nota-label" for="direccion">Dirección</label>
+          <input class="form-control nota-control" id="direccion" name="direccion" maxlength="240" required
+                 value="{{ request.form.get('direccion', configuracion.direccion) }}">
+        </div>
+      </div>
+
+      <hr class="my-4">
+      <h2 class="h5 fw-bold mb-3"><i class="bi bi-bank me-2" style="color:#61ADFF;"></i>Cuenta para pagos con factura</h2>
+      <p class="small policy-help">Estos datos se muestran en las notas de pedidos que requieren factura.</p>
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label nota-label" for="cuenta_fiscal_banco">Banco</label>
+          <input class="form-control nota-control" id="cuenta_fiscal_banco" name="cuenta_fiscal_banco" maxlength="60"
+                 value="{{ request.form.get('cuenta_fiscal_banco', configuracion.cuenta_fiscal_banco or '') }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label nota-label" for="cuenta_fiscal_titular">Titular</label>
+          <input class="form-control nota-control" id="cuenta_fiscal_titular" name="cuenta_fiscal_titular" maxlength="150"
+                 value="{{ request.form.get('cuenta_fiscal_titular', configuracion.cuenta_fiscal_titular or '') }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label nota-label" for="cuenta_fiscal_clabe">CLABE</label>
+          <input class="form-control nota-control" type="text" inputmode="numeric" pattern="[0-9]{18}"
+                 id="cuenta_fiscal_clabe" name="cuenta_fiscal_clabe" maxlength="18"
+                 value="{{ request.form.get('cuenta_fiscal_clabe', configuracion.cuenta_fiscal_clabe or '') }}">
+          <div class="form-text">Si se captura, debe tener exactamente 18 dígitos.</div>
+        </div>
+      </div>
+
+      <hr class="my-4">
+      <h2 class="h5 fw-bold mb-3"><i class="bi bi-image me-2" style="color:#FF42CA;"></i>Logo</h2>
+      {% if configuracion.logo_archivo %}
+      <div class="mb-3">
+        <img class="logo-preview" src="{{ url_for('static', filename='uploads/logos/' ~ configuracion.logo_archivo) }}" alt="Logo actual">
+        <div class="form-check mt-2">
+          <input class="form-check-input" type="checkbox" id="quitar_logo" name="quitar_logo">
+          <label class="form-check-label" for="quitar_logo">Quitar logo actual</label>
+        </div>
+      </div>
+      {% else %}
+      <p class="small text-muted">Aún no hay un logo cargado.</p>
+      {% endif %}
+      <label class="form-label nota-label" for="logo">Subir o reemplazar logo</label>
+      <input class="form-control nota-control" type="file" id="logo" name="logo" accept=".png,.jpg,.jpeg,image/png,image/jpeg">
+      <div class="form-text">Formatos PNG o JPG. Tamaño máximo: 3 MB. Se mostrará proporcionado en el encabezado del PDF.</div>
+
+      <hr class="my-4">
+      <h2 class="h5 fw-bold mb-2"><i class="bi bi-layout-text-sidebar me-2" style="color:#61ADFF;"></i>Apartados personalizados</h2>
+      <p class="small policy-help">Puedes usar {folio}, {cliente}, {total} y {saldo}; se reemplazan en cada nota.</p>
+      <div id="lista-apartados" class="d-flex flex-column gap-3 mb-3"></div>
+      <button type="button" class="btn btn-outline-primary rounded-pill px-4" id="agregar-apartado">+ Agregar apartado</button>
+      <input type="hidden" name="apartados_json" id="apartados_json">
+
+      <template id="tpl-apartado">
+        <div class="card apartado-card" data-apartado>
+          <div class="card-body">
+            <div class="d-flex flex-wrap align-items-end gap-2 mb-3">
+              <div class="flex-grow-1">
+                <label class="form-label nota-label small mb-1">Título</label>
+                <input type="text" class="form-control nota-control" data-campo="titulo" maxlength="80" required>
+                <div class="form-text">Obligatorio. Ejemplo: MÉTODOS DE PAGO.</div>
+              </div>
+              <div class="form-check form-switch mb-2 ms-2">
+                <input class="form-check-input" type="checkbox" role="switch" data-campo="activo">
+                <label class="form-check-label">Activo</label>
+              </div>
+            </div>
+            <div class="mb-3">
+              <span class="nota-label small me-2">Mostrar en:</span>
+              <div class="form-check form-check-inline">
+                <input class="form-check-input" type="checkbox" data-destino="nota">
+                <label class="form-check-label">Nota PDF</label>
+              </div>
+              <div class="form-check form-check-inline">
+                <input class="form-check-input" type="checkbox" data-destino="whatsapp">
+                <label class="form-check-label">WhatsApp</label>
+              </div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label nota-label small mb-1" data-label-condicion>Cuándo mostrar</label>
+              <select class="form-select nota-control" data-campo="condicion">
+                <option value="siempre">Siempre</option>
+                <option value="con_saldo">Solo si hay saldo pendiente</option>
+              </select>
+            </div>
+            <div class="d-flex flex-column gap-2 mb-2" data-bloques></div>
+            <div class="d-flex flex-wrap justify-content-between gap-2 mt-3">
+              <button type="button" class="btn btn-sm btn-outline-primary rounded-pill" data-accion="agregar-bloque">+ Agregar subtítulo</button>
+              <div class="d-flex gap-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill" data-accion="subir" title="Mover arriba" aria-label="Mover arriba">↑</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill" data-accion="bajar" title="Mover abajo" aria-label="Mover abajo">↓</button>
+                <button type="button" class="btn btn-sm btn-outline-danger rounded-pill" data-accion="eliminar-apartado">Eliminar apartado</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <template id="tpl-bloque">
+        <div class="apartado-bloque" data-bloque>
+          <div class="d-flex gap-2 mb-1">
+            <input type="text" class="form-control nota-control" data-campo="subtitulo" maxlength="80" placeholder="Subtítulo">
+            <button type="button" class="btn btn-outline-danger" data-accion="eliminar-bloque" title="Eliminar bloque" aria-label="Eliminar bloque"><i class="bi bi-trash"></i></button>
+          </div>
+          <textarea class="form-control nota-control" data-campo="texto" rows="3" maxlength="1000" placeholder="Texto"></textarea>
+        </div>
+      </template>
+
+      <hr class="my-4">
+      <h2 class="h5 fw-bold mb-2"><i class="bi bi-exclamation-circle me-2" style="color:#61ADFF;"></i>Políticas de servicio</h2>
+      <p class="small policy-help">Escribe una política por línea. Se imprimirán en el pie de cada nota.</p>
+      <textarea class="form-control nota-control" id="politicas" name="politicas" rows="7" maxlength="5000">{{ request.form.get('politicas', configuracion.politicas) }}</textarea>
+
+      <div class="d-flex flex-wrap justify-content-between gap-2 mt-4">
+        <a href="{{ url_for('dashboard.index') }}" class="btn btn-outline-secondary rounded-pill px-4">Volver</a>
+        <button type="submit" class="btn rounded-pill px-4 text-white" style="background:#1769AA;">
+          <i class="bi bi-check2-circle me-1"></i> Guardar configuración
+        </button>
+      </div>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const APARTADOS = {{ apartados | tojson }};
+  const MAX_APARTADOS = 10;
+  const MAX_BLOQUES = 10;
+  // "ticket" ya no se edita aquí; se guarda siempre como false.
+  const DESTINOS = ["nota", "whatsapp"];
+
+  const form = document.getElementById("apartados_json").form;
+  const lista = document.getElementById("lista-apartados");
+  const botonAgregar = document.getElementById("agregar-apartado");
+  const tplApartado = document.getElementById("tpl-apartado");
+  const tplBloque = document.getElementById("tpl-bloque");
+  let contadorIds = 0;
+
+  // Enlaza cada label con su input mediante un id único.
+  function enlazarLabels(raiz) {
+    raiz.querySelectorAll(".form-check").forEach(function (check) {
+      const input = check.querySelector("input");
+      const label = check.querySelector("label");
+      input.id = "apartado-campo-" + (++contadorIds);
+      label.htmlFor = input.id;
+    });
+    const select = raiz.querySelector('[data-campo="condicion"]');
+    if (select) {
+      select.id = "apartado-campo-" + (++contadorIds);
+      raiz.querySelector("[data-label-condicion]").htmlFor = select.id;
+    }
+  }
+
+  function actualizarEstado() {
+    const apartados = lista.querySelectorAll("[data-apartado]");
+    botonAgregar.disabled = apartados.length >= MAX_APARTADOS;
+    apartados.forEach(function (apartado, indice) {
+      const bloques = apartado.querySelectorAll("[data-bloque]").length;
+      apartado.querySelector('[data-accion="agregar-bloque"]').disabled = bloques >= MAX_BLOQUES;
+      apartado.querySelector('[data-accion="subir"]').disabled = indice === 0;
+      apartado.querySelector('[data-accion="bajar"]').disabled = indice === apartados.length - 1;
+    });
+  }
+
+  function crearBloque(contenedor, datos) {
+    const fragmento = tplBloque.content.cloneNode(true);
+    const bloque = fragmento.querySelector("[data-bloque]");
+    bloque.querySelector('[data-campo="subtitulo"]').value = (datos && datos.subtitulo) || "";
+    bloque.querySelector('[data-campo="texto"]').value = (datos && datos.texto) || "";
+    contenedor.appendChild(fragmento);
+  }
+
+  function crearApartado(datos) {
+    const fragmento = tplApartado.content.cloneNode(true);
+    const apartado = fragmento.querySelector("[data-apartado]");
+    const mostrarEn = (datos && datos.mostrar_en) || { nota: true, ticket: false, whatsapp: false };
+    const titulo = apartado.querySelector('[data-campo="titulo"]');
+    titulo.value = (datos && datos.titulo) || "";
+    titulo.setCustomValidity(titulo.value.trim() ? "" : "Escribe un título para el apartado.");
+    titulo.addEventListener("input", function () {
+      titulo.setCustomValidity(titulo.value.trim() ? "" : "Escribe un título para el apartado.");
+    });
+    apartado.querySelector('[data-campo="condicion"]').value =
+      datos && datos.condicion === "con_saldo" ? "con_saldo" : "siempre";
+    apartado.querySelector('[data-campo="activo"]').checked = datos ? Boolean(datos.activo) : true;
+    DESTINOS.forEach(function (destino) {
+      apartado.querySelector('[data-destino="' + destino + '"]').checked = Boolean(mostrarEn[destino]);
+    });
+    const contenedor = apartado.querySelector("[data-bloques]");
+    ((datos && datos.bloques) || []).slice(0, MAX_BLOQUES).forEach(function (bloque) {
+      crearBloque(contenedor, bloque);
+    });
+    enlazarLabels(apartado);
+    lista.appendChild(fragmento);
+    return apartado;
+  }
+
+  lista.addEventListener("click", function (evento) {
+    const boton = evento.target.closest("[data-accion]");
+    if (!boton) return;
+    const apartado = boton.closest("[data-apartado]");
+    switch (boton.dataset.accion) {
+      case "agregar-bloque": {
+        const contenedor = apartado.querySelector("[data-bloques]");
+        if (contenedor.querySelectorAll("[data-bloque]").length < MAX_BLOQUES) {
+          crearBloque(contenedor, null);
+        }
+        break;
+      }
+      case "eliminar-bloque":
+        boton.closest("[data-bloque]").remove();
+        break;
+      case "subir":
+        if (apartado.previousElementSibling) {
+          lista.insertBefore(apartado, apartado.previousElementSibling);
+        }
+        break;
+      case "bajar":
+        if (apartado.nextElementSibling) {
+          lista.insertBefore(apartado.nextElementSibling, apartado);
+        }
+        break;
+      case "eliminar-apartado":
+        if (confirm("¿Eliminar este apartado?")) {
+          apartado.remove();
+        }
+        break;
+    }
+    actualizarEstado();
+  });
+
+  botonAgregar.addEventListener("click", function () {
+    if (lista.querySelectorAll("[data-apartado]").length >= MAX_APARTADOS) return;
+    const apartado = crearApartado(null);
+    actualizarEstado();
+    apartado.querySelector('[data-campo="titulo"]').focus();
+  });
+
+  form.addEventListener("submit", function () {
+    const datos = Array.from(lista.querySelectorAll("[data-apartado]")).map(function (apartado) {
+      const mostrarEn = { ticket: false };
+      DESTINOS.forEach(function (destino) {
+        mostrarEn[destino] = apartado.querySelector('[data-destino="' + destino + '"]').checked;
+      });
+      return {
+        titulo: apartado.querySelector('[data-campo="titulo"]').value,
+        activo: apartado.querySelector('[data-campo="activo"]').checked,
+        mostrar_en: mostrarEn,
+        condicion: apartado.querySelector('[data-campo="condicion"]').value,
+        bloques: Array.from(apartado.querySelectorAll("[data-bloque]")).map(function (bloque) {
+          return {
+            subtitulo: bloque.querySelector('[data-campo="subtitulo"]').value,
+            texto: bloque.querySelector('[data-campo="texto"]').value,
+          };
+        }),
+      };
+    });
+    document.getElementById("apartados_json").value = JSON.stringify(datos);
+  });
+
+  (Array.isArray(APARTADOS) ? APARTADOS : []).slice(0, MAX_APARTADOS).forEach(crearApartado);
+  actualizarEstado();
+})();
+</script>
+{% endblock %}

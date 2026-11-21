@@ -1,0 +1,439 @@
+{% extends 'base.html' %}
+
+{% block title %}Stickers · PrintFlow Manager{% endblock %}
+
+{% block styles %}
+<style>
+    #stickers-app .st-card, .st-modal .modal-content {
+        background: #fff; border: 0; border-radius: 20px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, .04);
+    }
+    #stickers-app .st-card { padding: 1.25rem; }
+    #stickers-app .form-control, #stickers-app .form-select,
+    .st-modal .form-control, .st-modal .form-select {
+        border-radius: 50px; background-color: #f2f2f2; border: 1px solid transparent;
+    }
+    #stickers-app .form-control:focus, #stickers-app .form-select:focus,
+    .st-modal .form-control:focus, .st-modal .form-select:focus {
+        border-color: var(--pf-nav); box-shadow: 0 0 0 .2rem rgba(29, 99, 237, .12); background-color: #fff;
+    }
+    #stickers-app .form-control:disabled, #stickers-app .form-select:disabled { opacity: .45; }
+    #stickers-app .form-control-color { width: 44px; padding: .2rem; }
+    .st-label { font-size: .78rem; font-weight: 600; color: #6c757d; margin-bottom: .25rem; }
+    .min-w-0 { min-width: 0; }
+
+    .btn-pf { background: var(--pf-nav); color: #fff; border-radius: 50px; border: 0; padding: .5rem 1.1rem; font-weight: 500; }
+    .btn-pf:hover, .btn-pf:focus { background: #1554d0; color: #fff; }
+    .btn-pf:disabled { background: var(--pf-nav); color: #fff; opacity: .45; }
+    .btn-suave { background: #f2f2f2; color: #333; border-radius: 50px; border: 0; padding: .5rem 1.1rem; font-weight: 500; }
+    .btn-suave:hover, .btn-suave:focus { background: #e6e6e6; color: #111; }
+    .btn-suave:disabled { opacity: .45; }
+    .btn-icono {
+        width: 34px; height: 34px; border-radius: 50%; border: 0; background: #f2f2f2; color: #444;
+        display: inline-flex; align-items: center; justify-content: center; padding: 0; flex: 0 0 auto;
+    }
+    .btn-icono:hover { background: #e6e6e6; }
+    .btn-icono.activo { background: var(--pf-nav); color: #fff; }
+    .btn-icono:disabled { opacity: .4; }
+
+    .paso-titulo { display: flex; align-items: center; gap: .65rem; font-weight: 600; font-size: 1.05rem; margin-bottom: 1rem; }
+    .paso-num {
+        width: 30px; height: 30px; border-radius: 50%; background: var(--pf-nav); color: #fff;
+        display: inline-flex; align-items: center; justify-content: center; font-size: .9rem; font-weight: 700;
+    }
+
+    .tipo-opcion {
+        display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .4rem;
+        height: 100%; padding: 1rem .5rem; border: 2px solid #eee; border-radius: 16px; cursor: pointer;
+        text-align: center; font-weight: 500; color: #444; transition: border-color .15s, background .15s;
+    }
+    .tipo-opcion i { font-size: 1.7rem; }
+    .btn-check:checked + .tipo-opcion { border-color: var(--pf-nav); color: var(--pf-nav); background: #f3f7ff; }
+
+    .segmentado { display: flex; background: #f2f2f2; border-radius: 50px; padding: 3px; gap: 2px; }
+    .segmentado label {
+        flex: 1 1 0; text-align: center; border-radius: 50px; padding: .4rem .5rem; cursor: pointer;
+        font-size: .9rem; font-weight: 500; color: #555; white-space: nowrap;
+    }
+    .segmentado .btn-check:checked + label { background: var(--pf-nav); color: #fff; }
+    .segmentado button { flex: 1 1 0; border: 0; background: transparent; border-radius: 50px; padding: .35rem .5rem; color: #555; }
+    .segmentado button.activo { background: var(--pf-nav); color: #fff; }
+
+    .chip { display: inline-flex; flex-direction: column; background: #f2f2f2; border-radius: 14px; padding: .4rem .75rem; min-width: 0; }
+    .chip small { color: #6c757d; font-size: .72rem; }
+    .chip span { font-weight: 600; font-size: .88rem; white-space: nowrap; }
+
+    .enlace-collapse { color: var(--pf-nav); text-decoration: none; font-weight: 500; font-size: .92rem; }
+    .enlace-collapse .bi-chevron-down { transition: transform .2s; display: inline-block; }
+    .enlace-collapse[aria-expanded="true"] .bi-chevron-down { transform: rotate(180deg); }
+
+    .diseno-fila { border: 1px solid #f0f0f0; border-radius: 16px; padding: .6rem; margin-top: .6rem; }
+    .diseno-fila .mini { width: 48px; height: 48px; object-fit: contain; border-radius: 10px; background: #f6f7f9; flex: 0 0 48px; }
+    .diseno-fila .nombre { font-weight: 600; font-size: .9rem; }
+    .diseno-fila .form-control, .diseno-fila .form-select { padding: .25rem .6rem; font-size: .85rem; }
+    .inp-cant { width: 70px !important; flex: 0 0 70px; }
+    .inp-mm { width: 66px !important; flex: 0 0 66px; }
+    .sel-forma { width: auto !important; flex: 0 0 auto; padding-right: 1.8rem !important; }
+    .ajustes-diseno { padding-top: .6rem; }
+    .lista-vacia { color: #8a8f98; font-size: .9rem; text-align: center; padding: 1.25rem .5rem; border: 2px dashed #eee; border-radius: 16px; margin-top: .75rem; }
+
+    .col-derecha { position: sticky; top: 96px; align-self: flex-start; }
+    .vista-barra { height: 44px; display: flex; align-items: center; gap: .5rem; margin-bottom: .75rem; }
+    .vista-etiqueta { font-weight: 600; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .btn-avisos {
+        border: 0; border-radius: 50px; padding: .3rem .8rem; font-size: .82rem; font-weight: 600;
+        background: #fff4d6; color: #8a6200; white-space: nowrap;
+    }
+    .btn-avisos.sin-avisos { background: #f2f2f2; color: #8a8f98; opacity: .7; }
+    .popover-avisos { max-width: 380px; font-size: .85rem; }
+
+    .preview-box {
+        height: calc(100vh - 300px); min-height: 420px; display: flex; align-items: center; justify-content: center;
+        position: relative; background: #f6f7f9; border-radius: 16px; overflow: hidden;
+    }
+    .preview-svg { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; padding: 1rem; transition: opacity .15s; }
+    .preview-svg svg { max-width: 100%; max-height: 100%; width: 100%; height: 100%; }
+    .preview-box.cargando .preview-svg { opacity: .45; }
+    .preview-spinner { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity .15s; }
+    .preview-box.cargando .preview-spinner { opacity: 1; }
+    .preview-vacio { color: #8a8f98; text-align: center; }
+    .preview-vacio i { font-size: 2.6rem; display: block; margin-bottom: .5rem; }
+
+    .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .6rem; margin-top: .75rem; }
+    .kpi { height: 64px; background: #f6f7f9; border-radius: 14px; padding: .45rem .75rem; display: flex; flex-direction: column; justify-content: center; min-width: 0; }
+    .kpi small { color: #6c757d; font-size: .74rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .kpi .valor { font-weight: 700; font-size: 1.15rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .kpi .btn-aplicar { border: 0; background: none; color: var(--pf-nav); font-size: .78rem; font-weight: 600; padding: 0 0 0 .4rem; }
+    .kpi .btn-aplicar:disabled { opacity: .35; color: #6c757d; }
+
+    .pie { display: grid; height: 52px; margin-top: .75rem; }
+    .pie > .pie-set { grid-area: 1 / 1; display: flex; align-items: center; justify-content: flex-end; gap: .5rem; transition: opacity .15s; }
+    .pie > .pie-set.inactivo { visibility: hidden; opacity: 0; pointer-events: none; }
+    .pie-corte { display: flex; gap: .5rem; }
+    .pie-corte .btn-pf, .pie-corte .btn-suave { white-space: nowrap; }
+    .btn-ayuda { background: none; border: 0; color: #8a8f98; font-size: 1.15rem; padding: 0 .25rem; line-height: 1; }
+    .btn-ayuda:hover, .btn-ayuda:focus { color: #333; }
+
+    .zona-subida {
+        border: 2px dashed #d6dbe3; border-radius: 16px; padding: 1.1rem; text-align: center; color: #6c757d;
+        cursor: pointer; transition: border-color .15s, background .15s;
+    }
+    .zona-subida.arrastrando, .zona-subida:hover { border-color: var(--pf-nav); background: #f3f7ff; color: var(--pf-nav); }
+    .subida-item { font-size: .82rem; margin-top: .45rem; }
+    .subida-item .progress { height: 6px; border-radius: 50px; }
+    .subida-item .progress-bar { background: var(--pf-nav); }
+
+    .bib-grid { display: grid; grid-template-columns: repeat(auto-fill, 140px); gap: .75rem; justify-content: start; }
+    .bib-card {
+        width: 140px; position: relative; border: 2px solid #f0f0f0; border-radius: 16px; padding: .5rem;
+        cursor: pointer; background: #fff; transition: border-color .15s;
+    }
+    .bib-card:hover { border-color: #d6dbe3; }
+    .bib-card.sel { border-color: var(--pf-nav); background: #f3f7ff; }
+    .bib-card.en-trabajo { cursor: default; opacity: .6; }
+    .bib-mini { height: 100px; display: flex; align-items: center; justify-content: center; background: #f6f7f9; border-radius: 10px; overflow: hidden; }
+    .bib-mini img { max-width: 100%; max-height: 100%; object-fit: contain; }
+    .bib-nombre { font-weight: 600; font-size: .82rem; margin-top: .4rem; }
+    .bib-check {
+        position: absolute; top: .4rem; left: .4rem; width: 24px; height: 24px; border-radius: 50%;
+        background: var(--pf-nav); color: #fff; display: flex; align-items: center; justify-content: center;
+        opacity: 0; transition: opacity .15s;
+    }
+    .bib-card.sel .bib-check { opacity: 1; }
+    .bib-acciones { position: absolute; top: .4rem; right: .4rem; display: flex; gap: .25rem; }
+    .bib-acciones button { width: 26px; height: 26px; border-radius: 50%; border: 0; background: rgba(255, 255, 255, .92); color: #444; padding: 0; font-size: .8rem; box-shadow: 0 1px 4px rgba(0, 0, 0, .1); }
+    .bib-acciones button:hover { color: var(--pf-nav); }
+    .bib-acciones button.borrar:hover { color: #dc3545; }
+
+    .pl-item { border: 1px solid #f0f0f0; border-radius: 16px; padding: .75rem; margin-bottom: .6rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="stickers-app" class="container-xxl py-4" data-api="{{ url_for('stickers.index') }}api/">
+    <div class="row g-4">
+        <!-- Columna izquierda: pasos -->
+        <div class="col-lg-5 col-xl-4">
+            <!-- 1. Tipo de trabajo -->
+            <div class="st-card mb-4">
+                <div class="paso-titulo"><span class="paso-num">1</span>Tipo de trabajo</div>
+                <div class="row g-2">
+                    <div class="col-6">
+                        <input type="radio" class="btn-check" name="tipo" id="tipo-con-corte" value="con_corte" autocomplete="off">
+                        <label class="tipo-opcion" for="tipo-con-corte"><i class="bi bi-scissors"></i>Con corte (plotter)</label>
+                    </div>
+                    <div class="col-6">
+                        <input type="radio" class="btn-check" name="tipo" id="tipo-sin-corte" value="sin_corte" autocomplete="off">
+                        <label class="tipo-opcion" for="tipo-sin-corte"><i class="bi bi-printer"></i>Solo impresión</label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. Hoja -->
+            <div class="st-card mb-4">
+                <div class="paso-titulo"><span class="paso-num">2</span>Hoja</div>
+
+                <div id="grupo-plantilla" class="mb-3">
+                    <div class="st-label">Plantilla</div>
+                    <div class="d-flex gap-2">
+                        <select id="sel-plantilla" class="form-select"></select>
+                        <button type="button" class="btn-icono" style="width:38px;height:38px" data-bs-toggle="modal" data-bs-target="#modal-plantillas" title="Plantillas">
+                            <i class="bi bi-gear"></i>
+                        </button>
+                    </div>
+                    <div id="info-plantilla" class="mt-3">
+                        <div class="d-flex flex-wrap gap-2">
+                            <div class="chip"><small>Hoja física</small><span id="chip-hoja-fisica">—</span></div>
+                            <div class="chip"><small>Área útil</small><span id="chip-area">—</span></div>
+                            <div class="chip"><small>Libre abajo</small><span id="chip-libre">—</span></div>
+                        </div>
+                        <div class="form-check mt-3">
+                            <input class="form-check-input" type="checkbox" id="chk-ocultar-gris" data-estado="ocultar_gris">
+                            <label class="form-check-label" for="chk-ocultar-gris">Ocultar fondo gris</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="grupo-hoja" class="mb-3">
+                    <div class="st-label">Tamaño</div>
+                    <div class="segmentado">
+                        <input type="radio" class="btn-check" name="preset" id="preset-carta" value="carta" autocomplete="off">
+                        <label for="preset-carta">Carta</label>
+                        <input type="radio" class="btn-check" name="preset" id="preset-tabloide" value="tabloide" autocomplete="off">
+                        <label for="preset-tabloide">12×18</label>
+                        <input type="radio" class="btn-check" name="preset" id="preset-personalizada" value="personalizada" autocomplete="off">
+                        <label for="preset-personalizada">Personalizada</label>
+                    </div>
+                    <div id="hoja-personalizada" class="row g-2 mt-1">
+                        <div class="col-6">
+                            <div class="st-label">Ancho (mm)</div>
+                            <input type="number" class="form-control" id="hoja-ancho" min="50" max="1300" step="0.1" data-estado="hoja.ancho_mm" data-efecto="personalizada">
+                        </div>
+                        <div class="col-6">
+                            <div class="st-label">Alto (mm)</div>
+                            <input type="number" class="form-control" id="hoja-alto" min="50" max="1300" step="0.1" data-estado="hoja.alto_mm" data-efecto="personalizada">
+                        </div>
+                    </div>
+                    <div class="row g-2 mt-1">
+                        <div class="col-6">
+                            <div class="st-label">Orientación</div>
+                            <div class="segmentado" id="orientacion">
+                                <button type="button" data-orientacion="vertical" title="Vertical"><i class="bi bi-file-earmark"></i></button>
+                                <button type="button" data-orientacion="horizontal" title="Horizontal"><i class="bi bi-file-earmark" style="display:inline-block;transform:rotate(90deg)"></i></button>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="st-label">Margen (mm)</div>
+                            <input type="number" class="form-control" min="0" max="50" step="0.5" data-estado="hoja.margen_mm">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-2 align-items-end">
+                    <div class="col-6">
+                        <div class="st-label">Separación (mm)</div>
+                        <input type="number" class="form-control" min="0" max="50" step="0.5" data-estado="separacion_mm">
+                    </div>
+                    <div class="col-6">
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" role="switch" id="chk-rellenar" data-estado="rellenar">
+                            <label class="form-check-label" for="chk-rellenar">Rellenar hoja</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="grupo-marcas" class="mt-3">
+                    <a class="enlace-collapse" data-bs-toggle="collapse" href="#collapse-marcas" role="button" aria-expanded="false" aria-controls="collapse-marcas">
+                        Marcas (avanzado) <i class="bi bi-chevron-down"></i>
+                    </a>
+                    <div class="collapse" id="collapse-marcas">
+                        <div class="row g-2 pt-3">
+                            <div class="col-6">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" role="switch" id="chk-marcas" data-estado="marcas.activas">
+                                    <label class="form-check-label" for="chk-marcas">Marcas activas</label>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" role="switch" id="chk-marcas-corte" data-estado="marcas.incluir_corte">
+                                    <label class="form-check-label" for="chk-marcas-corte">En archivos de corte</label>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="st-label">Tipo</div>
+                                <select class="form-select" data-estado="marcas.tipo">
+                                    <option value="L">L (esquinas)</option>
+                                    <option value="cuadro">Cuadro</option>
+                                </select>
+                            </div>
+                            <div class="col-6">
+                                <div class="st-label">Largo (mm)</div>
+                                <input type="number" class="form-control" min="3" max="50" step="0.5" data-estado="marcas.largo_mm">
+                            </div>
+                            <div class="col-6">
+                                <div class="st-label">Grosor (mm)</div>
+                                <input type="number" class="form-control" min="0.1" max="5" step="0.1" data-estado="marcas.grosor_mm">
+                            </div>
+                            <div class="col-6">
+                                <div class="st-label">Distancia al borde (mm)</div>
+                                <input type="number" class="form-control" min="0" max="100" step="0.5" data-estado="marcas.distancia_borde_mm">
+                            </div>
+                            <div class="col-6">
+                                <div class="st-label">Holgura (mm)</div>
+                                <input type="number" class="form-control" min="0" max="50" step="0.5" data-estado="marcas.holgura_mm">
+                            </div>
+                            <div class="col-6">
+                                <div class="st-label">Distancia inferior (mm)</div>
+                                <input type="number" class="form-control" min="40" max="150" step="1" value="40" data-estado="marcas.distancia_inferior_mm">
+                                <div class="form-text">Mínimo 40 mm</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. Diseños -->
+            <div class="st-card mb-4">
+                <div class="paso-titulo"><span class="paso-num">3</span>Diseños</div>
+                <button type="button" class="btn-pf w-100" id="btn-abrir-biblioteca">
+                    <i class="bi bi-collection me-1"></i>Agregar desde biblioteca
+                </button>
+                <div id="lista-disenos"></div>
+            </div>
+        </div>
+
+        <!-- Columna derecha: vista previa -->
+        <div class="col-lg-7 col-xl-8 col-derecha">
+            <div class="st-card">
+                <div class="vista-barra">
+                    <button type="button" class="btn-icono" id="btn-vista-anterior" title="Anterior"><i class="bi bi-chevron-left"></i></button>
+                    <button type="button" class="btn-icono" id="btn-vista-siguiente" title="Siguiente"><i class="bi bi-chevron-right"></i></button>
+                    <div class="vista-etiqueta flex-grow-1" id="vista-etiqueta">Sin hojas</div>
+                    <button type="button" class="btn-avisos sin-avisos" id="btn-avisos">
+                        <i class="bi bi-exclamation-triangle me-1"></i>Avisos (<span class="n">0</span>)
+                    </button>
+                </div>
+
+                <div class="preview-box" id="preview-box">
+                    <div class="preview-svg" id="preview-svg">
+                        <div class="preview-vacio"><i class="bi bi-grid-3x3-gap"></i>Agrega diseños para ver el acomodo</div>
+                    </div>
+                    <div class="preview-spinner"><div class="spinner-border" style="color: var(--pf-nav);" role="status"></div></div>
+                </div>
+
+                <div class="kpis">
+                    <div class="kpi"><small>Total</small><div class="valor" id="kpi-total">—</div></div>
+                    <div class="kpi"><small>Por hoja</small><div class="valor" id="kpi-por-hoja">—</div></div>
+                    <div class="kpi"><small>Hojas</small><div class="valor" id="kpi-hojas">—</div></div>
+                    <div class="kpi">
+                        <small>Orientación sugerida</small>
+                        <div class="d-flex align-items-baseline min-w-0">
+                            <div class="valor" id="kpi-orientacion">—</div>
+                            <button type="button" class="btn-aplicar" id="btn-aplicar-orientacion" disabled>Aplicar</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pie">
+                    <div class="pie-set" data-caso="sin_corte">
+                        <button type="button" class="btn-pf" data-exportar="impresion"><i class="bi bi-file-earmark-pdf me-1"></i>PDF de impresión</button>
+                        <button type="button" class="btn-suave" data-imprimir><i class="bi bi-printer me-1"></i>Imprimir</button>
+                    </div>
+                    <div class="pie-set" data-caso="plantilla">
+                        <button type="button" class="btn-ayuda" data-ayuda aria-label="Cómo cortar"><i class="bi bi-question-circle"></i></button>
+                        <button type="button" class="btn-suave" data-exportar="impresion"><i class="bi bi-file-earmark-pdf me-1"></i>PDF de impresión</button>
+                        <button type="button" class="btn-suave" data-imprimir><i class="bi bi-printer me-1"></i>Imprimir</button>
+                        <div class="pie-corte"></div>
+                    </div>
+                    <div class="pie-set" data-caso="marcas">
+                        <button type="button" class="btn-ayuda" data-ayuda aria-label="Cómo cortar"><i class="bi bi-question-circle"></i></button>
+                        <button type="button" class="btn-suave" data-exportar="impresion"><i class="bi bi-file-earmark-pdf me-1"></i>PDF de impresión</button>
+                        <button type="button" class="btn-suave" data-imprimir><i class="bi bi-printer me-1"></i>Imprimir</button>
+                        <div class="pie-corte"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Biblioteca -->
+<div class="modal fade st-modal" id="modal-biblioteca" tabindex="-1" aria-labelledby="titulo-biblioteca" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header border-0">
+                <h5 class="modal-title fw-semibold" id="titulo-biblioteca">Biblioteca de diseños</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body pt-0">
+                <div class="row g-2 mb-3">
+                    <div class="col-md-8">
+                        <input type="search" class="form-control" id="bib-buscar" placeholder="Buscar por nombre…">
+                    </div>
+                    <div class="col-md-4">
+                        <select class="form-select" id="bib-orden">
+                            <option value="reciente">Recientes</option>
+                            <option value="nombre">Nombre</option>
+                            <option value="uso">Más usados</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="zona-subida mb-2" id="zona-subida" tabindex="0">
+                    <i class="bi bi-cloud-arrow-up fs-3 d-block"></i>
+                    Arrastra archivos aquí o haz clic para seleccionarlos (PNG, JPG o PDF)
+                    <input type="file" id="bib-archivos" accept=".png,.jpg,.jpeg,.pdf,image/png,image/jpeg,application/pdf" multiple hidden>
+                </div>
+                <div id="bib-subidas" class="mb-3"></div>
+                <div class="bib-grid" id="bib-grid"></div>
+                <div class="text-center text-muted py-4" id="bib-vacia" hidden>No hay diseños.</div>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn-suave" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn-pf" id="btn-agregar-seleccion" disabled>Agregar (<span class="n">0</span>) al trabajo</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Plantillas -->
+<div class="modal fade st-modal" id="modal-plantillas" tabindex="-1" aria-labelledby="titulo-plantillas" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header border-0">
+                <h5 class="modal-title fw-semibold" id="titulo-plantillas">Plantillas SignMaster</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body pt-0">
+                <form id="form-plantilla" class="row g-2 align-items-end mb-4">
+                    <div class="col-md-5">
+                        <div class="st-label">Archivo PDF</div>
+                        <input type="file" class="form-control" name="archivo" id="pl-archivo" accept=".pdf,application/pdf" required>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="st-label">Nombre</div>
+                        <input type="text" class="form-control" name="nombre" id="pl-nombre" required>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="st-label">Hoja física</div>
+                        <select class="form-select" name="hoja_fisica">
+                            <option value="carta">Carta</option>
+                            <option value="tabloide">12×18</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <button type="submit" class="btn-pf w-100" id="btn-subir-plantilla">Subir</button>
+                    </div>
+                </form>
+                <div id="lista-plantillas"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="toast-container position-fixed bottom-0 end-0 p-3" id="st-toasts" style="z-index: 1100;"></div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='stickers/stickers.js') }}"></script>
+{% endblock %}

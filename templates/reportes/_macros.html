@@ -1,0 +1,1 @@
+{% macro dinero(v) -%}{{ '-' if v < 0 else '' }}${{ '{:,.2f}'.format(v|abs) }}{%- endmacro %}

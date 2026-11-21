@@ -1,0 +1,186 @@
+{# Información operativa del pedido, SIN datos financieros.
+   Se usa en la tarjeta del tablero (bloque expandido) y en la ficha.
+   Requiere static/css/info_produccion.css y static/js/info_produccion.js.
+
+   Uso:
+     {% from 'pedidos/_info_produccion.html' import info_produccion, boton_terminar with context %}
+     {{ info_produccion(pedido) }}
+     {% call info_produccion(pedido) %}...contenido a la derecha del folio...{% endcall %}
+
+   acciones_producto=True muestra el botón para terminar cada producto asignado (solo ficha).
+   compacto=True (tarjeta del tablero) omite folio, estatus y entrega, que ya están en el
+   encabezado de la tarjeta, y "Responsables" cuando hay asignación por producto.
+   solo_lectura=True muestra el teléfono como texto, sin el botón de WhatsApp. #}
+
+{% macro info_produccion(pedido, acciones_producto=False, compacto=False, solo_lectura=False) %}
+{% set clase_est = {'En proceso': 'est-proceso', 'Terminado': 'est-terminado', 'Entregado': 'est-entregado', 'Cancelado': 'est-cancelado'}.get(pedido.estatus, 'est-proceso') %}
+{% set nota_whatsapp = puede('pedidos.gestionar') %}
+<div class="info-produccion{% if compacto %} info-produccion--compacto{% endif %}">
+
+  {% if not compacto %}
+  <div class="ip-encabezado">
+    <div>
+      <div class="ip-folio">{{ pedido.folio }}</div>
+      <div class="mt-1"><span class="badge-estatus {{ clase_est }}">{{ pedido.estatus }}</span></div>
+    </div>
+    {% if caller %}<div class="ip-encabezado-extra">{{ caller() }}</div>{% endif %}
+  </div>
+
+  <div class="ip-sec">
+    <div class="ip-label">Entrega</div>
+    <div class="ip-valor"><i class="bi bi-calendar3 me-1"></i>
+      {{- pedido.fecha_entrega.strftime('%d/%m/%Y · %I:%M %p') if pedido.fecha_entrega else '—' }}</div>
+  </div>
+  {% elif caller %}
+  <div class="ip-encabezado-extra">{{ caller() }}</div>
+  {% endif %}
+
+  {% if compacto %}
+  <div class="ip-sec ip-cliente-linea">
+    <strong>{{ pedido.nombre_cliente }}</strong>{% if pedido.telefono_cliente %} · {% endif %}
+    {% if pedido.whatsapp_url and not solo_lectura %}
+      {% if nota_whatsapp %}
+        {% set lineas = namespace(detalles=[]) %}
+        {% for d in pedido.detalles %}
+          {% set lineas.detalles = lineas.detalles + ['• ' ~ ('%g'|format(d.cantidad|float)) ~ 'x ' ~ d.descripcion] %}
+        {% endfor %}
+        {% set entrega_msg = 'ya fue entregado' if pedido.estatus == 'Entregado' else ('está listo para ser entregado' if pedido.estatus == 'Terminado' else 'está en proceso de elaboración') %}
+        {% set msg = 'Hola *' ~ pedido.nombre_cliente ~ '*, tu pedido con folio *' ~ pedido.folio ~ '* ' ~ entrega_msg ~ '.' ~ '\n\n*Detalles:*\n' ~ (lineas.detalles|join('\n') if lineas.detalles else '• Detalles registrados en la nota') ~ '\n\n*Total a liquidar:* $' ~ ('%.2f'|format(pedido.saldo_restante)) %}
+        {% set apartados_msg = pedido.texto_apartados_whatsapp %}
+        {% if apartados_msg %}{% set msg = msg ~ '\n\n' ~ apartados_msg %}{% endif %}
+      {% else %}
+        {% set msg = 'Hola, te escribo de ' ~ config.get('NOMBRE_CLIENTE', 'Área Creativa') ~ ' sobre tu pedido ' ~ pedido.folio %}
+      {% endif %}
+      <a href="{{ pedido.whatsapp_url }}?text={{ msg|urlencode }}" target="_blank" rel="noopener noreferrer"
+         class="btn-whatsapp" title="Abrir chat de WhatsApp{% if nota_whatsapp %} y copiar nota PNG{% endif %}"
+         {% if nota_whatsapp %}data-png-url="{{ url_for('pedidos.descargar_ticket_png', id_pedido=pedido.id_pedido) }}" onclick="abrirWhatsAppYCopiarNota(this)"{% endif %}>
+        <i class="bi bi-whatsapp"></i> {{ pedido.telefono_cliente }}
+      </a>
+      {% if nota_whatsapp %}<span class="wa-copy-status small text-muted" aria-live="polite"></span>{% endif %}
+    {% elif pedido.telefono_cliente %}
+      <span class="small text-muted"><i class="bi bi-telephone me-1"></i>{{ pedido.telefono_cliente }}</span>
+    {% else %}
+      <span class="small text-muted">Sin teléfono.</span>
+    {% endif %}
+  </div>
+  {% else %}
+  <div class="ip-sec">
+    <div class="ip-label">Cliente</div>
+    <div class="ip-valor">{{ pedido.nombre_cliente }}</div>
+  </div>
+
+  <div class="ip-sec">
+    <div class="ip-label">Contacto</div>
+    {% if pedido.whatsapp_url and not solo_lectura %}
+      {% if nota_whatsapp %}
+        {% set lineas = namespace(detalles=[]) %}
+        {% for d in pedido.detalles %}
+          {% set lineas.detalles = lineas.detalles + ['• ' ~ ('%g'|format(d.cantidad|float)) ~ 'x ' ~ d.descripcion] %}
+        {% endfor %}
+        {% set entrega_msg = 'ya fue entregado' if pedido.estatus == 'Entregado' else ('está listo para ser entregado' if pedido.estatus == 'Terminado' else 'está en proceso de elaboración') %}
+        {% set msg = 'Hola *' ~ pedido.nombre_cliente ~ '*, tu pedido con folio *' ~ pedido.folio ~ '* ' ~ entrega_msg ~ '.' ~ '\n\n*Detalles:*\n' ~ (lineas.detalles|join('\n') if lineas.detalles else '• Detalles registrados en la nota') ~ '\n\n*Total a liquidar:* $' ~ ('%.2f'|format(pedido.saldo_restante)) %}
+        {% set apartados_msg = pedido.texto_apartados_whatsapp %}
+        {% if apartados_msg %}{% set msg = msg ~ '\n\n' ~ apartados_msg %}{% endif %}
+      {% else %}
+        {% set msg = 'Hola, te escribo de ' ~ config.get('NOMBRE_CLIENTE', 'Área Creativa') ~ ' sobre tu pedido ' ~ pedido.folio %}
+      {% endif %}
+      <a href="{{ pedido.whatsapp_url }}?text={{ msg|urlencode }}" target="_blank" rel="noopener noreferrer"
+         class="btn-whatsapp" title="Abrir chat de WhatsApp{% if nota_whatsapp %} y copiar nota PNG{% endif %}"
+         {% if nota_whatsapp %}data-png-url="{{ url_for('pedidos.descargar_ticket_png', id_pedido=pedido.id_pedido) }}" onclick="abrirWhatsAppYCopiarNota(this)"{% endif %}>
+        <i class="bi bi-whatsapp"></i> {{ pedido.telefono_cliente }}
+      </a>
+      {% if nota_whatsapp %}<span class="wa-copy-status small text-muted" aria-live="polite"></span>{% endif %}
+    {% elif pedido.telefono_cliente %}
+      <span class="small text-muted"><i class="bi bi-telephone me-1"></i>{{ pedido.telefono_cliente }}</span>
+    {% else %}
+      <span class="small text-muted">Sin teléfono.</span>
+    {% endif %}
+  </div>
+
+  {% endif %}
+
+  {% if not (compacto and pedido.tiene_asignaciones_por_producto) %}
+  {% if compacto %}
+  <div class="ip-sec ip-resp-linea">{{ pedido.responsables_asignados|map(attribute='nombre')|join(', ') or 'Sin asignar' }}</div>
+  {% else %}
+  <div class="ip-sec">
+    <div class="ip-label">Responsables</div>
+    {% for r in pedido.responsables_asignados %}
+      <span class="ip-resp-pill">{{ r.nombre }}</span>
+    {% else %}
+      <span class="ip-resp-pill ip-resp-pill--vacio">Sin asignar</span>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% endif %}
+
+  <div class="ip-sec">
+    <div class="ip-label">Productos</div>
+    <ul class="list-unstyled mb-0">
+      {% for d in pedido.detalles %}
+        {% if compacto %}
+        <li class="ip-producto">
+          <div>
+            <span>{{ '%g'|format(d.cantidad|float) }} × {{ d.descripcion }}</span>
+            {% if d.configuracion and d.configuracion.get('detalle_produccion') %}
+            <div class="small text-muted">Producción: {{ d.configuracion.get('detalle_produccion') }}</div>
+            {% endif %}
+          </div>
+          {% if pedido.tiene_asignaciones_por_producto %}
+            <span class="ip-producto-resp">
+              {%- if d.asignacion %}{{ d.asignacion.usuario.nombre }}
+                {%- if d.asignacion.completado %} <i class="bi bi-check-circle-fill text-success" title="Terminado" aria-label="Terminado"></i>{% endif %}
+              {%- else %}Sin responsable{% endif -%}
+            </span>
+          {% endif %}
+        </li>
+        {% else %}
+        <li class="ip-producto">
+          <div>{{ '%g'|format(d.cantidad|float) }} × {{ d.descripcion }}</div>
+          {% if d.configuracion and d.configuracion.get('detalle_produccion') %}
+          <div class="small text-muted">Producción: {{ d.configuracion.get('detalle_produccion') }}</div>
+          {% endif %}
+          {% if pedido.tiene_asignaciones_por_producto %}
+            {% if d.asignacion %}
+            <div class="d-flex justify-content-between align-items-center gap-2 mt-1">
+              <span class="small text-muted">
+                <i class="bi bi-person me-1"></i>{{ d.asignacion.usuario.nombre }}
+                {% if d.asignacion.completado %}<i class="bi bi-check-circle-fill text-success ms-1" title="Terminado" aria-label="Terminado"></i>{% endif %}
+              </span>
+              {% if acciones_producto and not d.asignacion.completado and pedido.estatus == 'En proceso' and puede('dashboard.terminar') and (not solo_sus_pedidos() or d.asignacion.id_usuario == usuario_actual.id_usuario) %}
+                <form action="{{ url_for('pedidos.terminar_producto', id_pedido=pedido.id_pedido, id_detalle=d.id_detalle) }}" method="POST">
+                  <button type="submit" class="btn btn-sm btn-outline-success rounded-pill">✓ Marcar terminado</button>
+                </form>
+              {% endif %}
+            </div>
+            {% else %}
+            <span class="badge text-bg-warning rounded-pill mt-1">Sin responsable asignado</span>
+            {% endif %}
+          {% endif %}
+        </li>
+        {% endif %}
+      {% else %}
+        <li class="text-muted">Sin productos.</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  {% if pedido.notas %}
+  <div class="ip-sec">
+    <div class="ip-label">Notas</div>
+    <div class="ip-notas">{{ pedido.notas|enlazar }}</div>
+  </div>
+  {% endif %}
+
+</div>
+{% endmacro %}
+
+
+{# Botón único para marcar el pedido como terminado (tarjeta y ficha). #}
+{% macro boton_terminar(pedido, volver=none) %}
+<form action="{{ url_for('dashboard.cambiar_estado', pedido_id=pedido.id_pedido) }}" method="POST" class="form-terminar">
+  <input type="hidden" name="nuevo_estado" value="Terminado">
+  {% if volver %}<input type="hidden" name="volver" value="{{ volver }}">{% endif %}
+  <button type="submit" class="btn btn-success btn-terminar">✓ Marcar como terminado</button>
+</form>
+{% endmacro %}

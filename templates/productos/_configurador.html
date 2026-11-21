@@ -1,0 +1,79 @@
+<div
+  class="modal fade"
+  id="modalConfiguradorProductos"
+  tabindex="-1"
+  aria-labelledby="modalConfiguradorProductosTitulo"
+  aria-hidden="true"
+  data-url-buscar="{{ url_for('productos.buscar') }}"
+  data-url-cotizar="{{ url_for('productos.cotizar_producto') }}"
+>
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title fs-5" id="modalConfiguradorProductosTitulo">Agregar producto</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label for="configuradorBusqueda" class="form-label">Buscar producto</label>
+          <input type="search" class="form-control" id="configuradorBusqueda" autocomplete="off" placeholder="Nombre o clave del producto">
+          <div class="form-text" id="configuradorBusquedaAyuda">Escribe al menos 2 caracteres.</div>
+          <div class="list-group mt-2" id="configuradorResultadosBusqueda" role="listbox" aria-label="Resultados de productos"></div>
+        </div>
+
+        <div class="mb-3">
+          <label for="configuradorPresentacion" class="form-label">Presentación</label>
+          <select class="form-select" id="configuradorPresentacion" disabled>
+            <option value="">Selecciona un producto primero</option>
+          </select>
+        </div>
+
+        <div class="row g-3" id="configuradorCampos" hidden>
+          <div class="col-12 col-sm-6" data-campo="cantidad" hidden>
+            <label for="configuradorCantidad" class="form-label">Cantidad</label>
+            <input type="number" class="form-control" id="configuradorCantidad" min="0.01" step="any" inputmode="decimal">
+          </div>
+          <div class="col-12 col-sm-6" data-campo="largo" hidden>
+            <label for="configuradorLargo" class="form-label">Largo (m)</label>
+            <input type="number" class="form-control" id="configuradorLargo" min="0.001" step="any" inputmode="decimal">
+          </div>
+          <div class="col-12 col-sm-6" data-campo="ancho" hidden>
+            <label for="configuradorAncho" class="form-label">Ancho (m)</label>
+            <input type="number" class="form-control" id="configuradorAncho" min="0.001" step="any" inputmode="decimal">
+          </div>
+          <div class="col-12 col-sm-6" data-campo="alto" hidden>
+            <label for="configuradorAlto" class="form-label">Alto (m)</label>
+            <input type="number" class="form-control" id="configuradorAlto" min="0.001" step="any" inputmode="decimal">
+          </div>
+          <div class="col-12 col-sm-6" data-campo="minutos" hidden>
+            <label for="configuradorMinutos" class="form-label">Minutos</label>
+            <input type="number" class="form-control" id="configuradorMinutos" min="0.01" step="any" inputmode="decimal">
+          </div>
+          <div class="col-12 col-sm-6" data-campo="precio_libre" hidden>
+            <label for="configuradorPrecioLibre" class="form-label">Precio unitario</label>
+            <input type="number" class="form-control" id="configuradorPrecioLibre" min="0" step="any" inputmode="decimal">
+          </div>
+        </div>
+
+        <div class="alert alert-danger mt-3 mb-0" id="configuradorError" role="alert" hidden></div>
+        <section class="card mt-3" id="configuradorResumen" aria-live="polite" hidden>
+          <div class="card-body">
+            <div class="d-flex justify-content-between gap-3">
+              <span>Precio unitario</span><strong id="configuradorUnitario">—</strong>
+            </div>
+            <div class="d-flex justify-content-between gap-3 mt-1">
+              <span>Subtotal</span><strong id="configuradorSubtotal">—</strong>
+            </div>
+            <div class="small text-body-secondary mt-2" id="configuradorDetalles"></div>
+            <div class="alert alert-warning mt-2 mb-0 py-2" id="configuradorMinimo" hidden></div>
+            <ul class="small mt-2 mb-0" id="configuradorAvisos" hidden></ul>
+          </div>
+        </section>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="configuradorAgregar" disabled>Agregar</button>
+      </div>
+    </div>
+  </div>
+</div>

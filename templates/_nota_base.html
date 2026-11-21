@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Nota{% endblock %}</title>
+    <style>
+        @page { size: letter; margin: 14mm 12mm; }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0; padding: 24px; background: #eef2f7; color: #1f2937;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; font-size: 13px;
+        }
+        .hoja {
+            max-width: 8.5in; margin: 0 auto; padding: .55in .5in; background: #fff;
+            box-shadow: 0 6px 24px rgba(15, 23, 42, .12); border-radius: 6px;
+        }
+        .acciones { max-width: 8.5in; margin: 0 auto 14px; display: flex; justify-content: flex-end; gap: 8px; }
+        .acciones button {
+            border: 0; border-radius: 999px; padding: 9px 22px; font-size: 14px; font-weight: 600; cursor: pointer;
+        }
+        .btn-imprimir { background: #1d63ed; color: #fff; }
+        .btn-cerrar { background: #fff; color: #374151; border: 1px solid #cbd5e1 !important; }
+
+        .encabezado { display: flex; align-items: center; gap: 18px; padding-bottom: 14px; border-bottom: 3px solid #1d63ed; }
+        .encabezado img { max-width: 150px; max-height: 80px; object-fit: contain; }
+        .negocio h1 { margin: 0; font-size: 21px; color: #0b2a6f; }
+        .negocio .lema { margin: 2px 0 6px; font-style: italic; color: #6b7280; }
+        .negocio p { margin: 1px 0; color: #374151; }
+        .titulo-doc { margin-left: auto; text-align: right; }
+        .titulo-doc h2 { margin: 0; font-size: 16px; text-transform: uppercase; letter-spacing: .04em; color: #1d63ed; }
+        .titulo-doc p { margin: 3px 0 0; color: #6b7280; }
+
+        .cliente { display: flex; flex-wrap: wrap; gap: 6px 28px; margin: 16px 0; padding: 10px 14px; background: #f3f7ff; border-radius: 8px; }
+        .cliente span { color: #6b7280; }
+
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 7px 6px; border-bottom: 1px solid #e5e7eb; text-align: left; vertical-align: top; }
+        th { font-size: 11px; text-transform: uppercase; letter-spacing: .03em; color: #6b7280; border-bottom: 2px solid #cbd5e1; }
+        td.num, th.num { text-align: right; white-space: nowrap; }
+        td.folio { font-weight: 700; white-space: nowrap; }
+        .estatus { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+        .estatus-proceso { background: #fff4d6; color: #8a5a00; }
+        .estatus-terminado { background: #dcfce7; color: #166534; }
+        .productos { margin: 0; padding-left: 14px; }
+        tr { page-break-inside: avoid; }
+        .vacio { padding: 24px; text-align: center; color: #6b7280; }
+
+        .totales { display: flex; justify-content: flex-end; gap: 12px; margin-top: 18px; }
+        .total-caja { min-width: 150px; padding: 10px 14px; border-radius: 8px; background: #f3f4f6; text-align: right; }
+        .total-caja span { display: block; font-size: 11px; text-transform: uppercase; color: #6b7280; }
+        .total-caja strong { font-size: 18px; }
+        .total-caja.saldo { background: #1d63ed; color: #fff; }
+        .total-caja.saldo span { color: #dbe6ff; }
+
+        .apartados { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 22px; }
+        .apartado { border: 1px solid #dbe3f0; border-radius: 8px; overflow: hidden; break-inside: avoid; page-break-inside: avoid; }
+        .apartado h3 {
+            margin: 0; padding: 6px 12px; background: #1d63ed; color: #fff;
+            font-size: 12px; text-transform: uppercase; letter-spacing: .04em;
+        }
+        .apartado-bloques { padding: 8px 12px; }
+        .apartado-bloque + .apartado-bloque { margin-top: 8px; }
+        .apartado-bloque strong { display: block; color: #0b2a6f; }
+        .apartado-bloque p { margin: 2px 0 0; white-space: pre-line; color: #374151; overflow-wrap: anywhere; }
+
+        .politicas { margin-top: 26px; padding-top: 10px; border-top: 1px solid #e5e7eb; font-size: 10.5px; color: #6b7280; }
+        .politicas h3 { margin: 0 0 4px; font-size: 11px; text-transform: uppercase; color: #374151; }
+        .politicas ul { margin: 0; padding-left: 16px; }
+
+        @media print {
+            body { padding: 0; background: #fff; }
+            .hoja { max-width: none; padding: 0; box-shadow: none; border-radius: 0; }
+            .acciones { display: none; }
+            .apartados { gap: 8px; }
+            .apartado { break-inside: avoid; page-break-inside: avoid; }
+            * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
+    </style>
+    {% block extra_styles %}{% endblock %}
+</head>
+<body>
+    {% block buttons %}{% endblock %}
+
+    <div class="hoja">
+        <header class="encabezado">
+            {% if configuracion.logo_archivo %}
+            <img src="{{ url_for('static', filename='uploads/logos/' ~ configuracion.logo_archivo) }}" alt="Logo">
+            {% endif %}
+            <div class="negocio">
+                <h1>{{ configuracion.nombre_negocio }}</h1>
+                {% if configuracion.lema %}<p class="lema">{{ configuracion.lema }}</p>{% endif %}
+                {% if configuracion.direccion %}<p>{{ configuracion.direccion }}</p>{% endif %}
+                {% if configuracion.telefono %}<p>Tel. {{ configuracion.telefono }}</p>{% endif %}
+            </div>
+            <div class="titulo-doc">
+                <h2>{% block document_title %}Nota{% endblock %}</h2>
+                <p>{% block document_date %}{% endblock %}</p>
+            </div>
+        </header>
+
+        {% block content %}{% endblock %}
+
+        {% set politicas = (configuracion.politicas or '').strip().splitlines()|map('trim')|select|list %}
+        {% if politicas %}
+        <footer class="politicas">
+            <h3>Términos y políticas</h3>
+            <ul>
+                {% for linea in politicas %}<li>{{ linea }}</li>{% endfor %}
+            </ul>
+        </footer>
+        {% endif %}
+    </div>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

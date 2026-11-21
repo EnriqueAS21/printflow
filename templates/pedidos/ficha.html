@@ -1,0 +1,88 @@
+{# Ficha de un pedido (destino del QR de la etiqueta). Variables: pedido, es_responsable #}
+{% extends 'base.html' %}
+{% block title %}Pedido {{ pedido.folio }}{% endblock %}
+
+{% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/etiquetas.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/info_produccion.css') }}">
+<style>
+  .ficha { max-width: 520px; margin: 0 auto; padding: 0 .75rem; }
+  .ficha-card { background: #fff; border: 1px solid #eaedf1; border-radius: 24px; padding: 1.5rem 1.4rem; box-shadow: 0 4px 14px rgba(0,0,0,.04); }
+  .ficha .ip-folio { font-size: 2rem; }
+  .ficha-sec { margin-top: 1rem; }
+  .badge-payment { display: inline-flex; align-items: center; gap: .35rem; padding: .2rem .65rem; border-radius: 6px; font-size: .8rem; font-weight: 600; }
+  .badge-payment.pagado { border: 1px solid #28a745; color: #28a745; background: #f1fbf4; }
+  .badge-payment.anticipo { border: 1px solid #212529; color: #212529; background: #f8f9fa; }
+  .badge-payment.sin-pagar { border: 1px solid #dc3545; color: #dc3545; background: #fdf3f3; }
+  .btn-ficha { width: 100%; border: none; border-radius: 30px; padding: .8rem; font-weight: 700; font-size: 1.05rem; color: #fff; }
+  .btn-ticket { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 40px; padding: 0 14px;
+                border: 1px solid #ced4da; background: #fff; color: #495057; border-radius: 20px; white-space: nowrap; }
+  .btn-ticket:hover { border-color: #0084ff; color: #0084ff; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% from 'pedidos/_info_produccion.html' import info_produccion, boton_terminar with context %}
+{% set ve_finanzas = puede('pedidos.gestionar') or puede('caja.ver') %}
+{% set btn_etiqueta = puede('etiquetas.imprimir') or puede('pedidos.gestionar') %}
+{% set mostrar_terminar = pedido.estatus == 'En proceso' and not pedido.tiene_asignaciones_por_producto and puede('dashboard.terminar') and (usuario_actual.rol != 'Produccion' or es_responsable) %}
+{% set mostrar_entregar = pedido.estatus == 'Terminado' and puede('dashboard.entregar') %}
+
+<div class="ficha">
+  <div class="ficha-card">
+    {% if puede('pedidos.gestionar') %}
+      {% call info_produccion(pedido, acciones_producto=True) %}
+      <span class="badge-payment {% if pedido.estado_pago == 'Pagado' %}pagado{% elif pedido.estado_pago == 'Anticipo' %}anticipo{% else %}sin-pagar{% endif %}">
+        <i class="bi bi-cash-stack"></i> {{ pedido.estado_pago }}
+      </span>
+      {% endcall %}
+    {% else %}
+      {{ info_produccion(pedido, acciones_producto=True) }}
+    {% endif %}
+
+    {% if ve_finanzas %}
+    <div class="ficha-sec d-flex flex-wrap gap-3 small fw-semibold">
+      <span>Total: ${{ '%.2f'|format(pedido.total_float) }}</span>
+      <span class="text-success">Pagado: ${{ '%.2f'|format(pedido.total_pagado) }}</span>
+      <span class="{% if pedido.saldo_restante > 0 %}text-danger{% else %}text-success{% endif %}">Saldo: ${{ '%.2f'|format(pedido.saldo_restante) }}</span>
+    </div>
+    {% endif %}
+
+    {% if btn_etiqueta %}
+    <div class="ficha-sec d-flex justify-content-center">
+      <button type="button"
+              class="btn-ticket"
+              data-url="{{ url_for('pedidos.imprimir_etiqueta', id_pedido=pedido.id_pedido) }}"
+              data-folio="{{ pedido.folio }}"
+              onclick="imprimirEtiquetaCard(this)">
+        <i class="bi bi-tag"></i>
+        <span>Etiqueta</span>
+      </button>
+    </div>
+    {% endif %}
+
+    {% if mostrar_terminar %}
+    <div class="mt-4">{{ boton_terminar(pedido, volver='ficha') }}</div>
+    {% elif mostrar_entregar %}
+      {% if pedido.estado_pago == 'Pagado' %}
+      <form action="{{ url_for('dashboard.cambiar_estado', pedido_id=pedido.id_pedido) }}" method="POST" class="mt-4">
+        <input type="hidden" name="nuevo_estado" value="Entregado">
+        <input type="hidden" name="volver" value="ficha">
+        <button type="submit" class="btn-ficha" style="background:#ffc107;">✓ Marcar como entregado</button>
+      </form>
+      {% else %}
+      <button type="button" class="btn-ficha mt-4" style="background:#6c757d;opacity:.6;cursor:not-allowed;" disabled>🔒 Saldo pendiente</button>
+      {% endif %}
+    {% endif %}
+
+    <div class="text-center mt-3">
+      <a href="{{ url_for('dashboard.index') }}" class="small text-muted">← Ir al tablero</a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/etiquetas.js') }}"></script>
+<script src="{{ url_for('static', filename='js/info_produccion.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ticket {{ folio }}</title>
+  <style>
+
+:root {
+    --ancho-ticket: 48mm;
+}
+
+@page {
+    size: 58mm auto;
+    margin: 0;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    width: 58mm;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff;
+    color: #000;
+    font-family: "Courier New", Courier, monospace;
+    font-size: 11px;
+    line-height: 1.25;
+}
+
+body {
+    overflow-x: hidden;
+}
+
+.ticket {
+    width: var(--ancho-ticket);
+    max-width: var(--ancho-ticket);
+    margin: 0 auto;
+    padding: 0;
+    background: #fff;
+    overflow-wrap: anywhere;
+}
+
+.centro {
+    text-align: center;
+}
+
+.negocio {
+    font-size: 14px;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+
+.folio {
+    margin: 3px 0;
+    font-size: 17px;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+
+.sep {
+    border: 0;
+    border-top: 1px dashed #000;
+    margin: 5px 0;
+    width: 100%;
+}
+
+.fila {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 3px;
+    width: 100%;
+}
+
+.fila > * {
+    min-width: 0;
+}
+
+.fila > :first-child {
+    flex: 1;
+}
+
+.fila > :last-child {
+    text-align: right;
+    overflow-wrap: anywhere;
+}
+
+.item {
+    margin-bottom: 5px;
+    break-inside: avoid;
+    page-break-inside: avoid;
+}
+
+.desc {
+    overflow-wrap: anywhere;
+    word-break: normal;
+}
+
+.total {
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.chico {
+    font-size: 10px;
+}
+
+.barra {
+    display: flex;
+    gap: 8px;
+    width: min(100%, 320px);
+    margin: 12px auto;
+    font-family: system-ui, sans-serif;
+}
+
+.barra button {
+    flex: 1;
+    padding: 8px;
+    cursor: pointer;
+}
+
+@media print {
+    @page {
+        size: 58mm auto;
+        margin: 0;
+    }
+
+    html,
+    body {
+        width: 58mm !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #fff !important;
+        overflow: visible !important;
+    }
+
+    .ticket {
+        width: var(--ancho-ticket) !important;
+        max-width: var(--ancho-ticket) !important;
+        margin: 0 auto !important;
+        padding: 0 !important;
+        overflow: visible !important;
+    }
+
+    .no-print {
+        display: none !important;
+    }
+}
+
+  </style>
+</head>
+<body>
+  <div class="barra no-print">
+    {% if not auto_print %}<button type="button" onclick="window.print()">Imprimir ticket</button>{% endif %}
+    <button type="button" onclick="window.close()">Cerrar</button>
+  </div>
+
+  <main class="ticket">
+    <div class="centro negocio">{{ configuracion.nombre_negocio }}</div>
+    {% if configuracion.lema %}<div class="centro chico">{{ configuracion.lema }}</div>{% endif %}
+    <div class="centro chico">{{ configuracion.direccion }}</div>
+    <div class="centro chico">Tel. {{ configuracion.telefono }}</div>
+    <div class="centro">Ticket de venta</div>
+    <div class="centro folio">{{ folio }}</div>
+
+    <hr class="sep">
+    <div class="fila"><span>Fecha:</span><span>{{ fecha.strftime('%d/%m/%Y %I:%M %p') if fecha else '—' }}</span></div>
+    <div class="fila"><span>Pago:</span><span>{{ metodo_pago }}</span></div>
+    <hr class="sep">
+
+    {% for movimiento in movimientos %}
+    <div class="item">
+      <div class="desc">{{ movimiento.descripcion }}</div>
+      <div class="fila">
+        <span>{{ '%g'|format(movimiento.cantidad|float) }} x ${{ '%.2f'|format((movimiento.monto / movimiento.cantidad)|float) }}</span>
+        <span>${{ '%.2f'|format(movimiento.monto|float) }}</span>
+      </div>
+    </div>
+    {% endfor %}
+
+    <hr class="sep">
+    <div class="fila total"><span>TOTAL</span><span>${{ '%.2f'|format(total) }}</span></div>
+    <hr class="sep">
+    <div class="centro">¡Gracias por su compra!</div>
+    <div class="centro chico">Atendió: {{ atendio.nombre if atendio else '—' }}</div>
+    <div style="height: 6mm;"></div>
+  </main>
+  {% if auto_print %}
+  <script>
+    window.addEventListener('load', () => {
+      setTimeout(() => window.print(), 250);
+    });
+    window.addEventListener('afterprint', () => {
+      document.body.innerHTML = '<p style="font:14px system-ui;text-align:center;margin:2rem">Impresión finalizada. Puedes cerrar esta página.</p>';
+    });
+  </script>
+  {% endif %}
+</body>
+</html>

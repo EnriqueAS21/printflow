@@ -1,0 +1,617 @@
+{% extends 'base.html' %}
+
+{% block title %}Área Creativa - Caja y Ventas{% endblock %}
+
+{% block styles %}
+<style>
+  .desc-toggle { cursor: pointer; }
+  .desc-extra { display: none; margin-top: .25rem; font-size: .9rem; }
+  .desc-toggle.abierta .desc-extra { display: block; }
+  :root {
+    --ac-blue: #0088FF;
+    --ac-red: #ff3b30;
+    --ac-gray-input: #f2f2f2;
+    --ac-pill-radius: 50px;
+    --ac-card-radius: 20px;
+  }
+
+  body {
+    background-color: #f7f9fc;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+
+  .caja-wrap { max-width: 1150px; margin: 0 auto; }
+
+  /* Aviso de periodo */
+  .periodo-aviso { border-radius: 14px; padding: .5rem 1rem; font-size: .92rem; }
+  .periodo-aviso.alerta { background: #fff3cd; color: #664d03; border: 1px solid #ffe69c; }
+  .periodo-aviso.normal { background: transparent; color: #6c757d; padding-left: 0; padding-right: 0; }
+
+  /* Acciones */
+  .caja-acciones { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+  .caja-acciones .btn { border-radius: var(--ac-pill-radius); font-weight: 600; }
+  .caja-acciones .btn-opciones { background: #eef0f2; border: none; color: #111; }
+
+  /* Métricas compactas */
+  .caja-metricas { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .75rem; }
+  .metrica { background: #eef0f2; border-radius: 14px; padding: .6rem .9rem; min-width: 0; }
+  .metrica-label { font-size: .75rem; color: #6c757d; font-weight: 600; }
+  .metrica-num { font-size: 1.1rem; font-weight: 700; color: #111; line-height: 1.25; font-variant-numeric: tabular-nums; }
+  .metrica-sub { font-size: .72rem; color: #6c757d; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .metodos-sub { display: flex; flex-wrap: wrap; gap: .1rem .75rem; }
+  .metodos-sub i { margin-right: .15rem; }
+  .metrica.egresos .metrica-num { color: var(--ac-red); }
+
+  /* Tarjeta de historial */
+  .table-card-container {
+    background: #ffffff;
+    border-radius: var(--ac-card-radius);
+    padding: .75rem 1.25rem;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
+  }
+  .caja-table { margin-bottom: 0; }
+  .caja-table th {
+    background-color: #e9ecef;
+    color: #333;
+    font-weight: 700;
+    border: none;
+    padding: 0.6rem 1rem;
+    font-size: .88rem;
+  }
+  .caja-table td {
+    padding: 0.55rem 1rem;
+    color: #495057;
+    border-bottom: 1px solid #f1f3f5;
+  }
+  .caja-table .col-hora { white-space: nowrap; width: 8%; }
+  .caja-table .col-importe { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; font-weight: 600; width: 14%; }
+  .caja-table tr.fila-dia td {
+    background: #f7f9fc; color: #6c757d; font-weight: 700; font-size: .8rem;
+    text-transform: none; padding: .4rem 1rem; border-bottom: 1px solid #e9ecef;
+  }
+  .caja-table .egreso-txt { color: var(--ac-red); font-weight: 600; }
+  .metodo-tag {
+    display: inline-block; background: #eef0f2; color: #6c757d;
+    border-radius: 6px; font-size: .75rem; padding: .1rem .5rem; font-weight: 600;
+  }
+  .folio-link { color: var(--ac-blue); font-weight: 700; text-decoration: none; }
+  .folio-link:hover { text-decoration: underline; }
+  .caja-pie { font-size: .85rem; color: #6c757d; padding-top: .6rem; font-variant-numeric: tabular-nums; }
+
+  /* Inputs de los modales con estilo de Figma */
+  .modal-figma-card { border-radius: 20px; border: none; padding: 1rem; }
+  .figma-input {
+    background-color: var(--ac-gray-input) !important;
+    border: none !important;
+    border-radius: var(--ac-pill-radius) !important;
+    padding: 0.65rem 1.25rem !important;
+    color: #495057;
+  }
+  .figma-btn-guardar {
+    background-color: var(--ac-blue) !important;
+    color: white !important;
+    border-radius: var(--ac-pill-radius) !important;
+    padding: 0.5rem 2.2rem !important;
+    font-weight: 600 !important;
+    border: none !important;
+  }
+  .figma-banner-blue {
+    background-color: var(--ac-blue);
+    color: #ffffff;
+    border-radius: 12px;
+    padding: 0.75rem 1.25rem;
+    font-weight: 700;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  @media print {
+    .caja-top, .modal, .modal-backdrop, .btn-close, .alert { display: none !important; }
+    .container-fluid { padding: 0 !important; }
+    .table-card-container { box-shadow: none; border: 1px solid #dee2e6; }
+    .caja-scroll { height: auto !important; overflow: visible !important; }
+    body { background: #fff !important; }
+  }
+  .modal-backdrop {
+    background-color: rgba(15, 23, 42, 0.45) !important;
+    transition: opacity 0.2s linear !important;
+  }
+  .modal-backdrop.show {
+    opacity: 1 !important;
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+  }
+  .modal { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+  .modal.fade .modal-dialog { transition: transform 0.2s ease-out, opacity 0.2s ease-out !important; }
+
+  .filtro-input {
+    background-color: var(--ac-gray-input) !important;
+    border: none !important;
+    border-radius: var(--ac-pill-radius) !important;
+    padding: .45rem 1.1rem !important;
+    font-size: .9rem;
+  }
+  .filtro-input:focus { box-shadow: 0 0 0 3px rgba(0, 136, 255, .18) !important; }
+
+  .caja-modal .modal-footer > * { margin: 0; }
+  @media (min-width: 768px) {
+    .caja-modal .modal-dialog-scrollable { height: auto; }
+    .caja-modal .modal-dialog-scrollable .modal-content { max-height: none; overflow: visible; }
+    .caja-modal .modal-dialog-scrollable .modal-body { overflow-y: visible; }
+  }
+
+  /* Escritorio: todo cabe en pantalla; la tabla hace scroll interno con encabezado sticky */
+  @media (min-width: 992px) {
+    body[data-blueprint="caja"] main.py-4 { padding-bottom: 0 !important; padding-top: 1rem !important; }
+    .caja-top { position: sticky; top: var(--top-caja, 0px); z-index: 1020; background: #f7f9fc; padding: .5rem 0 .25rem; }
+    .caja-scroll { height: var(--alto-caja, 60vh); overflow: auto; }
+    .caja-table thead th { position: sticky; top: 0; z-index: 2; }
+    .caja-wrap { padding-bottom: 1rem; }
+  }
+
+  @media (max-width: 991.98px) {
+    .caja-metricas { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; }
+    .caja-acciones .btn-accion { flex: 1 1 0; min-width: 0; }
+    .caja-top { margin-bottom: .75rem; }
+
+    /* Historial: tabla convertida en tarjetas */
+    .table-card-container { background: transparent; box-shadow: none; padding: 0 .25rem; }
+    .caja-table { --bs-table-bg: transparent; }
+    .caja-table thead { display: none; }
+    .caja-table tbody tr {
+      display: flex; flex-direction: column;
+      background: #fff; border-radius: 16px; padding: .75rem; margin: .5rem 0;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, .06); overflow: hidden;
+    }
+    .caja-table tbody tr.fila-dia { display: none; }
+    .caja-table tbody tr.fila-egreso { background: #fff5f5; }
+    .caja-table td {
+      display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem;
+      padding: .35rem 0; text-align: right; background: transparent !important; box-shadow: none !important;
+    }
+    .caja-table tr > td:last-child { border-bottom: 0; }
+    .caja-table td::before { content: attr(data-label); color: #6c757d; font-size: .8rem; flex-shrink: 0; text-align: left; }
+    .caja-table td.pf-col-sec { display: none; }
+    .caja-table td[data-label="Folio"] { order: 1; }
+    .caja-table td[data-label="Importe"] { order: 2; }
+    .caja-table td[data-label="Método de pago"] { order: 3; }
+    .caja-table td[data-label="Descripción"] { order: 4; }
+    .caja-table td[colspan] { display: block; text-align: center; border: 0; }
+    .caja-table td[colspan]::before { content: none; }
+    .caja-pie { padding: .5rem .25rem 0; }
+
+    /* Crear nota: fondo claro para que el encabezado sea legible */
+    #modalCrearNota .modal-content { background: #f7f9fc !important; }
+    #modalCrearNota .modal-header { padding: 1rem 1rem .25rem !important; margin: 0 !important; }
+  }
+</style>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/formulario_pedido.css') }}">
+{% endblock %}
+
+{% block content %}
+{% set MES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'] %}
+<div class="container-fluid px-3">
+<div class="caja-wrap">
+
+  <div class="caja-top">
+    <!-- 1. Aviso de periodo -->
+    {% if periodo_desde %}
+      {% if periodo_atrasado %}
+        <div class="periodo-aviso alerta d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+          <span>Periodo abierto desde {{ periodo_desde.strftime('%d/%m %H:%M') }} · {{ dias_sin_corte }} día{{ '' if dias_sin_corte == 1 else 's' }} sin corte</span>
+          {% if puede('caja.corte') %}
+            <button type="button" class="btn btn-sm btn-warning rounded-pill fw-semibold" data-bs-toggle="modal" data-bs-target="#modalCorte">Hacer corte</button>
+          {% endif %}
+        </div>
+      {% else %}
+        <div class="periodo-aviso normal mb-1">
+          Periodo abierto desde {{ periodo_desde.strftime('%H:%M') if periodo_desde.date() == hoy else periodo_desde.strftime('%d/%m %H:%M') }}
+        </div>
+      {% endif %}
+    {% endif %}
+
+    <!-- 2. Acciones -->
+    <div class="caja-acciones mb-3">
+      <button type="button" class="btn btn-primary btn-accion" data-bs-toggle="modal" data-bs-target="#modalCrearNota">
+        <i class="bi bi-journal-plus me-1"></i>Crear nota
+      </button>
+      <button type="button" class="btn btn-outline-primary btn-accion" data-bs-toggle="modal" data-bs-target="#modalTicket">
+        <i class="bi bi-receipt me-1"></i>Crear ticket
+      </button>
+      <button type="button" class="btn btn-outline-danger btn-accion" data-bs-toggle="modal" data-bs-target="#modalEgreso">
+        <i class="bi bi-dash-circle me-1"></i>Registrar egreso
+      </button>
+      <button type="button" class="btn btn-light d-lg-none" data-bs-toggle="collapse" data-bs-target="#filtrosCaja" aria-controls="filtrosCaja" aria-label="Filtros">
+        <i class="bi bi-funnel"></i>
+      </button>
+      {% if puede('caja.corte') %}
+      <div class="dropdown ms-lg-auto">
+        <button type="button" class="btn btn-opciones px-3" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Opciones">
+          <i class="bi bi-three-dots"></i><span class="d-none d-lg-inline ms-1">Opciones</span>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end shadow border-0 rounded-4">
+          <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#modalCorte"><i class="bi bi-scissors me-2"></i>Corte</button></li>
+          <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#modalFondo"><i class="bi bi-wallet2 me-2"></i>Fondo inicial</button></li>
+          <li><a class="dropdown-item" href="{{ url_for('caja.reporte') }}" target="_blank" rel="noopener"><i class="bi bi-printer me-2"></i>Imprimir reporte</a></li>
+        </ul>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- 3. Métricas -->
+    {% set n_egresos = historial|selectattr('tipo', 'equalto', 'EGRESO')|list|length %}
+    <div class="caja-metricas mb-3">
+      <div class="metrica">
+        <div class="metrica-label">Ventas</div>
+        <div class="metrica-num">${{ '{:,.2f}'.format(total_ventas) }}</div>
+        <div class="metrica-sub metodos-sub">
+          <span title="Efectivo"><i class="bi bi-cash-coin"></i> ${{ '{:,.0f}'.format(ingresos_efectivo) }}</span>
+          <span title="Tarjeta"><i class="bi bi-credit-card"></i> ${{ '{:,.0f}'.format(ingresos_tarjeta) }}</span>
+          <span title="Transferencia"><i class="bi bi-bank"></i> ${{ '{:,.0f}'.format(ingresos_transferencia) }}</span>
+        </div>
+      </div>
+      <div class="metrica egresos">
+        <div class="metrica-label">Egresos</div>
+        <div class="metrica-num">${{ '{:,.2f}'.format(total_egresos) }}</div>
+        <div class="metrica-sub">{{ n_egresos }} movimiento{{ '' if n_egresos == 1 else 's' }}</div>
+      </div>
+      <div class="metrica">
+        <div class="metrica-label">Efectivo esperado en cajón</div>
+        <div class="metrica-num">${{ '{:,.2f}'.format(efectivo_esperado) }}</div>
+        <div class="metrica-sub">Fondo ${{ '{:,.0f}'.format(fondo_inicial) }}</div>
+      </div>
+      <div class="metrica">
+        <div class="metrica-label">Ganancia</div>
+        <div class="metrica-num">${{ '{:,.2f}'.format(total_ventas - total_egresos) }}</div>
+        <div class="metrica-sub">Ventas − egresos</div>
+      </div>
+    </div>
+
+    <!-- 4. Filtros -->
+    <div class="row g-2 mb-2 collapse d-lg-flex" id="filtrosCaja">
+      <div class="col-lg-4">
+        <input type="text" id="f-folio" class="form-control filtro-input" placeholder="Buscar folio o descripción" autocomplete="off">
+      </div>
+      <div class="col-lg-3">
+        <select id="f-metodo" class="form-select filtro-input">
+          <option value="">Todos los métodos</option>
+          <option value="Efectivo">Efectivo</option>
+          <option value="Tarjeta">Tarjeta</option>
+          <option value="Transferencia">Transferencia</option>
+        </select>
+      </div>
+      <div class="col-lg-3">
+        <select id="f-tipo" class="form-select filtro-input">
+          <option value="">Ventas y egresos</option>
+          <option value="venta">Solo ventas</option>
+          <option value="egreso">Solo egresos</option>
+        </select>
+      </div>
+      <div class="col-lg-2 d-grid">
+        <button type="button" id="f-limpiar" class="btn btn-outline-secondary rounded-pill">Limpiar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. Tabla -->
+  <div class="table-card-container">
+    <div class="caja-scroll" id="cajaScroll">
+      <table class="table align-middle caja-table" id="tabla-caja">
+        <thead>
+          <tr>
+            <th class="col-hora">Hora</th>
+            <th>Descripción</th>
+            <th style="width: 14%;">Método de pago</th>
+            <th style="width: 12%;">Folio</th>
+            <th class="col-importe text-end">Importe</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% set ns = namespace(dia=None) %}
+          {% for fila in historial %}
+            {% set dia = fila.fecha.date() if fila.fecha else None %}
+            {% if dia != ns.dia or loop.first %}
+              {% set ns.dia = dia %}
+              <tr class="fila-dia" data-dia="{{ dia.isoformat() if dia else '' }}">
+                <td colspan="5">{% if not dia %}Sin fecha{% elif dia == hoy %}Hoy · {{ dia.day }} {{ MES[dia.month - 1] }}{% else %}{{ dia.day }} {{ MES[dia.month - 1] }}{% endif %}</td>
+              </tr>
+            {% endif %}
+            {% set es_egreso = fila.tipo == 'EGRESO' %}
+            <tr class="{% if es_egreso %}fila-egreso{% endif %}"
+              data-tipo="{{ 'egreso' if es_egreso else 'venta' }}"
+              data-metodo="{{ fila.metodo_pago }}"
+              data-folio="{{ fila.folio | lower }}"
+              data-texto="{{ fila.lineas | join(' ') | lower }}"
+              data-dia="{{ dia.isoformat() if dia else '' }}"
+              data-importe="{{ fila.subtotal }}">
+              <td class="pf-col-sec col-hora" data-label="Hora">{{ fila.fecha.strftime('%I:%M %p').lstrip('0').lower().replace('am', 'a.m.').replace('pm', 'p.m.') if fila.fecha else '—' }}</td>
+              <td class="desc-toggle {% if es_egreso %}egreso-txt{% endif %}" data-label="Descripción" title="Clic para ver todo">
+                <div>
+                  {% if es_egreso %}<i class="bi bi-arrow-down me-1"></i>{% endif %}{{ fila.lineas[0] }}
+                  {% if fila.lineas|length > 1 %}
+                    <span class="badge bg-secondary ms-1">+{{ fila.lineas|length - 1 }}</span>
+                    <div class="desc-extra">
+                      {% for l in fila.lineas[1:] %}<div>• {{ l }}</div>{% endfor %}
+                    </div>
+                  {% endif %}
+                </div>
+              </td>
+              <td data-label="Método de pago"><span class="metodo-tag">{{ fila.metodo_pago }}</span></td>
+              <td data-label="Folio">
+                {% if fila.origen == 'Pedido' and fila.folio != 'N/A' and puede('dashboard.ver') %}
+                  <a class="folio-link" href="{{ url_for('pedidos.ficha', folio=fila.folio) }}">{{ fila.folio }}</a>
+                {% else %}
+                  <span class="{% if fila.folio != 'N/A' %}fw-bold text-dark{% else %}text-muted{% endif %}">{{ fila.folio }}</span>
+                {% endif %}
+              </td>
+              <td class="col-importe {% if es_egreso %}egreso-txt{% else %}text-dark{% endif %}" data-label="Importe">
+                {% if es_egreso %}-${{ '{:,.2f}'.format(-fila.subtotal) }}{% else %}${{ '{:,.2f}'.format(fila.subtotal) }}{% endif %}
+              </td>
+            </tr>
+          {% else %}
+          <tr>
+            <td colspan="5" class="text-center text-muted py-5">No hay movimientos registrados en este periodo.</td>
+          </tr>
+          {% endfor %}
+          <tr id="fila-sin-resultados" hidden>
+            <td colspan="5" class="text-center text-muted py-4">Ningún movimiento coincide con los filtros.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div id="pie-tabla" class="caja-pie"></div>
+  </div>
+</div>
+
+
+<div class="modal fade caja-modal" id="modalFondo" tabindex="-1" aria-labelledby="modalFondoTitulo" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" style="max-width: 480px;">
+    <form action="{{ url_for('caja.definir_fondo') }}" method="POST" class="modal-content modal-figma-card shadow-lg">
+      <div class="modal-header border-0 px-4 pt-4 pb-0">
+        <h5 class="modal-title fw-bold" id="modalFondoTitulo">Fondo inicial</h5>
+        <button type="button" class="btn-close d-md-none" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body px-4 pt-3 pb-0">
+        <input type="number" step="0.01" min="0" name="fondo_inicial" class="form-control figma-input mb-4"
+               value="{{ '%.2f'|format(fondo_inicial) }}" required>
+      </div>
+      <div class="modal-footer border-0 px-4 pt-0 pb-4 d-grid gap-2 d-md-flex">
+        <button type="submit" class="btn figma-btn-guardar">Guardar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL: CREAR NOTA (RECICLA EL FORMULARIO COMPLETO) -->
+<div class="modal fade caja-modal" id="modalCrearNota" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-pedido modal-fullscreen-lg-down">
+    <div class="modal-content border-0 bg-transparent">
+
+      <!-- AQUÍ SE RECICLA TODO EL FORMULARIO Y SU JAVASCRIPT -->
+      <div class="modal-body p-0">
+        {% include 'pedidos/_formulario_pedido.html' %}
+      </div>
+
+    </div>
+  </div>
+</div>
+
+{% include 'caja/_modal_ticket.html' %}
+
+<!-- MODAL 2: REGISTRAR EGRESO -->
+<div class="modal fade caja-modal" id="modalEgreso" tabindex="-1" aria-labelledby="modalEgresoTitulo" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" style="max-width: 580px;">
+    <form action="{{ url_for('caja.registrar_egreso') }}" method="POST" class="modal-content modal-figma-card shadow-lg">
+      <input type="hidden" name="token_envio" value="{{ token_envio() }}">
+      <div class="modal-header border-0 px-4 pt-4 pb-0">
+        <h5 class="modal-title fw-bold" id="modalEgresoTitulo">Registro de egresos</h5>
+        <button type="button" class="btn-close d-md-none" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body px-4 pt-3 pb-0">
+
+        <div class="row g-2 mb-3">
+          <div class="col-md-6">
+            <select name="metodo_pago" class="form-select figma-input" required>
+              <option value="Efectivo">Efectivo</option>
+              <option value="Tarjeta">Tarjeta</option>
+              <option value="Transferencia">Transferencia</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <input type="number" step="0.01" name="costo" class="form-control figma-input" placeholder="Costo" required>
+          </div>
+        </div>
+
+        <div class="mb-4">
+          <input type="text" name="descripcion" class="form-control figma-input" placeholder="Descripcion" required>
+        </div>
+      </div>
+      <div class="modal-footer border-0 px-4 pt-0 pb-4 d-grid gap-2 d-md-flex">
+        <button type="submit" class="btn figma-btn-guardar">Guardar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL: CORTE DE CAJA SIMPLIFICADO -->
+{% if puede('caja.corte') %}
+<div class="modal fade caja-modal" id="modalCorte" tabindex="-1" aria-labelledby="modalCorteTitulo" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" style="max-width: 580px;">
+    <form action="{{ url_for('caja.guardar_corte') }}" method="POST" class="modal-content modal-figma-card shadow-lg">
+      <div class="modal-header border-0 px-4 pt-4 pb-0 d-md-none">
+        <h5 class="modal-title fw-bold" id="modalCorteTitulo">Corte de caja</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body px-4 pt-3 pt-md-4 pb-0">
+        <div id="corteCajonAviso" class="alert alert-warning small d-none" role="alert">No se pudo abrir el cajón. Ábrelo con la llave.</div>
+
+        <!-- Fondo Inicial -->
+        <div class="figma-banner-blue mb-3">
+          <span>Fondo Inicial:</span>
+          <span>${{ '%.2f'|format(fondo_inicial) }}</span>
+        </div>
+
+        <!-- 1. Balance Global del Día -->
+        <div class="p-3 bg-light rounded-3 border mb-3">
+          <div class="d-flex justify-content-between text-muted small mb-1">
+            <span>Ventas Totales: <strong>${{ '%.2f'|format(total_ventas) }}</strong></span>
+            <span>Egresos Totales: <strong>${{ '%.2f'|format(total_egresos) }}</strong></span>
+          </div>
+          <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+            <span class="fw-bold text-dark">Ganancia neta del día:</span>
+            <span class="fw-bold fs-5 {% if (total_ventas - total_egresos) >= 0 %}text-success{% else %}text-danger{% endif %}">
+              ${{ '%.2f'|format(total_ventas - total_egresos) }}
+            </span>
+          </div>
+        </div>
+
+        <!-- 2. Arqueo de Efectivo Físico -->
+        <h6 class="fw-bold text-dark mb-2">Arqueo de Efectivo (Cajón)</h6>
+        <div class="p-3 rounded-3 mb-3 border bg-white shadow-sm">
+          <div class="d-flex justify-content-between small mb-1">
+            <span class="text-muted">Ingresos en Efectivo:</span>
+            <span class="text-success fw-semibold">+${{ '%.2f'|format(ingresos_efectivo) }}</span>
+          </div>
+          <div class="d-flex justify-content-between small mb-2">
+            <span class="text-muted">(-) Egresos en Efectivo de Mostrador:</span>
+            <span class="text-danger fw-semibold">-${{ '%.2f'|format(egresos_efectivo) }}</span>
+          </div>
+          <div class="d-flex justify-content-between pt-2 border-top align-items-center">
+            <span class="fw-bold text-dark">Efectivo disponible en caja:</span>
+            <span class="badge bg-success fs-6 px-3 py-2">${{ '%.2f'|format(efectivo_esperado) }}</span>
+          </div>
+        </div>
+
+        <!-- 3. Resumen Bancario / No Efectivo (Informativo) -->
+        <h6 class="fw-bold text-dark mb-2">Movimientos Electrónicos (Bancos)</h6>
+        <div class="p-3 bg-light rounded-3 border mb-3 small">
+          <div class="d-flex justify-content-between mb-1">
+            <span class="text-muted">• Ventas cobradas por Tarjeta:</span>
+            <span class="fw-semibold">${{ '%.2f'|format(ingresos_tarjeta) }}</span>
+          </div>
+          <div class="d-flex justify-content-between mb-1">
+            <span class="text-muted">• Ventas cobradas por Transferencia:</span>
+            <span class="fw-semibold">${{ '%.2f'|format(ingresos_transferencia) }}</span>
+          </div>
+          <div class="d-flex justify-content-between text-muted">
+            <span>• Egresos pagados con Tarjeta/Transf.:</span>
+            <span>${{ '%.2f'|format(egresos_tarjeta + egresos_transferencia) }}</span>
+          </div>
+        </div>
+
+        <!-- 4. Retiro de Efectivo -->
+        <div class="mb-4">
+          <label class="form-label small fw-bold text-muted">Retiro de efectivo para entrega / resguardo:</label>
+          <input type="number" step="0.01" name="retiro_efectivo" class="form-control figma-input" placeholder="$0.00">
+        </div>
+
+      </div>
+      <div class="modal-footer border-0 px-4 pt-0 pb-4 d-grid gap-2 d-md-flex">
+        <button type="submit" class="btn figma-btn-guardar">Guardar Corte</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/formulario_pedido.js') }}"></script>
+{% if puede('caja.corte') %}
+<script>
+  (function () {
+    const modal = document.getElementById('modalCorte');
+    if (!modal) return;
+    const aviso = document.getElementById('corteCajonAviso');
+    modal.addEventListener('show.bs.modal', async () => {
+      aviso.classList.add('d-none');
+      try {
+        const r = await fetch({{ url_for('caja.abrir_cajon_corte')|tojson }}, {
+          method: 'POST', headers: {'X-Requested-With': 'XMLHttpRequest'},
+        });
+        const d = await r.json();
+        if (!d.cajon_abierto) aviso.classList.remove('d-none');
+      } catch (e) {
+        aviso.classList.remove('d-none');
+      }
+    });
+  })();
+</script>
+{% endif %}
+<script>
+  document.querySelectorAll('.desc-toggle').forEach(td =>
+    td.addEventListener('click', () => td.classList.toggle('abierta')));
+
+  (function () {
+    const fFolio = document.getElementById('f-folio');
+    const fMetodo = document.getElementById('f-metodo');
+    const fTipo = document.getElementById('f-tipo');
+    const filas = [...document.querySelectorAll('#tabla-caja tbody tr[data-tipo]')];
+    const dias = [...document.querySelectorAll('#tabla-caja tbody tr.fila-dia')];
+    const pie = document.getElementById('pie-tabla');
+    const moneda = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' });
+    const norm = t => (t || '').toString().toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+
+    function aplicar() {
+      const q = norm(fFolio.value);
+      let n = 0, total = 0;
+      const conFilas = new Set();
+
+      filas.forEach(tr => {
+        const ok =
+          (!q || norm(tr.dataset.folio).includes(q) || norm(tr.dataset.texto).includes(q)) &&
+          (!fMetodo.value || tr.dataset.metodo === fMetodo.value) &&
+          (!fTipo.value || tr.dataset.tipo === fTipo.value);
+        tr.hidden = !ok;
+        if (ok) {
+          n++;
+          total += parseFloat(tr.dataset.importe) || 0;
+          conFilas.add(tr.dataset.dia);
+        }
+      });
+      dias.forEach(tr => { tr.hidden = !conFilas.has(tr.dataset.dia); });
+
+      const sin = document.getElementById('fila-sin-resultados');
+      if (sin) sin.hidden = !(filas.length && n === 0);
+      pie.innerHTML = `Mostrando <strong>${n}</strong> movimiento${n === 1 ? '' : 's'} · <strong>${moneda.format(total)}</strong>`;
+    }
+
+    fFolio.addEventListener('input', aplicar);
+    fMetodo.addEventListener('change', aplicar);
+    fTipo.addEventListener('change', aplicar);
+    document.getElementById('f-limpiar').addEventListener('click', () => {
+      fFolio.value = ''; fMetodo.value = ''; fTipo.value = '';
+      aplicar();
+    });
+    aplicar();
+  })();
+
+  // Escritorio: la tabla ocupa el resto de la pantalla (scroll interno)
+  (function () {
+    const caja = document.getElementById('cajaScroll');
+    const top = document.querySelector('.caja-top');
+    const navWrap = document.querySelector('.pf-nav-wrap');
+    if (!caja || !top) return;
+    const escritorio = window.matchMedia('(min-width: 992px)');
+    const raiz = document.documentElement.style;
+    function medir() {
+      if (!escritorio.matches) {
+        raiz.removeProperty('--top-caja');
+        raiz.removeProperty('--alto-caja');
+        return;
+      }
+      if (navWrap) raiz.setProperty('--top-caja', navWrap.getBoundingClientRect().height + 'px');
+      const inicio = caja.getBoundingClientRect().top + window.scrollY;
+      const pie = document.getElementById('pie-tabla');
+      const reservado = (pie ? pie.offsetHeight : 0) + 12 /* padding tarjeta */ + 24 /* margen inferior */;
+      raiz.setProperty('--alto-caja', Math.max(240, window.innerHeight - inicio - reservado) + 'px');
+    }
+    window.addEventListener('load', medir);
+    window.addEventListener('resize', medir);
+    escritorio.addEventListener('change', medir);
+    if ('ResizeObserver' in window) new ResizeObserver(medir).observe(top);
+    medir();
+  })();
+</script>
+{% endblock %}

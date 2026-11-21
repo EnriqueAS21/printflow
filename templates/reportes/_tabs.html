@@ -1,0 +1,6 @@
+<div class="rep-tabs no-print">
+  <a href="{{ url_for('reportes.ventas') }}" class="{{ 'activa' if tab == 'ventas' else '' }}">Ventas y flujo de caja</a>
+  <a href="{{ url_for('reportes.productividad') }}" class="{{ 'activa' if tab == 'productividad' else '' }}">Productividad</a>
+  <a href="{{ url_for('reportes.cartera') }}" class="{{ 'activa' if tab == 'cartera' else '' }}">Cartera</a>
+  {% if puede('caja.corte') %}<a href="{{ url_for('caja.reporte') }}">Corte de caja ↗</a>{% endif %}
+</div>

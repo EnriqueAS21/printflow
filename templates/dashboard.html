@@ -1,0 +1,1804 @@
+{% extends 'base.html' %}
+
+{% block title %}Área Creativa - Dashboard de Pedidos{% endblock %}
+
+{% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/etiquetas.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/info_produccion.css') }}">
+{# Columnas visibles al cargar: base.html decide columnas↔pestañas con esto antes del primer pintado. #}
+{% if columnas_produccion %}
+{% set n_cols_visibles = (columnas_produccion|selectattr('pedidos')|list|length) or (columnas_produccion|length) %}
+{% else %}{% set n_cols_visibles = 3 %}{% endif %}
+<script>window.PF_COLUMNAS_VISIBLES = {{ n_cols_visibles }};</script>
+<style>
+  :root {
+    --ac-blue: #0084ff;
+    --ac-card-bg: #ffffff;
+    --ac-border-radius: 24px;
+    --ac-pill-radius: 30px;
+    --badge-green: #28a745;
+    --badge-red: #dc3545;
+    --badge-dark: #212529;
+    --btn-yellow: #ffc107;
+  }
+
+  body {
+    background-color: #f7f9fc;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+
+  /* Barra de resumen (chips-filtro, una sola línea) */
+  .cabecera-tablero { display: contents; }   /* móvil: el contenedor no altera el diseño */
+  .barra-resumen {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 12px;
+    margin: 40px 1rem 28px;
+    white-space: nowrap;
+  }
+  /* margin lateral 1rem = padding del tablero; con el row (-.75rem) y el padding de columna (.75rem) alinea con el borde exterior de las columnas */
+  .container-fluid.sin-barra { padding-top: 40px; }   /* sin barra: el tablero conserva la separación de la navbar */
+  body[data-blueprint="dashboard"] main.py-4 { padding-top: 0 !important; }
+  .barra-resumen::-webkit-scrollbar { display: none; }
+  .barra-fecha { flex: none; color: #6c757d; font-size: .8rem; }
+  .chip-filtro {
+    flex: none; display: inline-flex; align-items: center; gap: .35rem;
+    background: #fff; border: 1px solid #ced4da; border-radius: 999px;
+    padding: 6px 14px; font-size: .85rem; line-height: 1.4; color: #212529; cursor: pointer;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .chip-filtro:hover { border-color: #9aa5b1; }
+  .chip-filtro.activo { border-color: var(--ac-blue); box-shadow: 0 0 0 1px var(--ac-blue); }
+  .chip-filtro b { font-weight: 700; }
+  .chip-punto { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .chip-punto.rojo { background: var(--badge-red); }
+  .chip-punto.ambar { background: #f59e0b; }
+  .chip-filtro.azul { background: #eaf3ff; border-color: #b6d4fe; color: #0b5ed7; }
+  .chip-filtro.azul.activo { border-color: var(--ac-blue); }
+
+  /* Columnas Kanban */
+  .kanban-board {
+    padding: 0 1rem 7rem 1rem;
+  }
+  .kanban-col {
+    background: var(--ac-card-bg);
+    border-radius: var(--ac-border-radius);
+    padding: 1.5rem 1.25rem;
+    border: 1px solid #eef0f3;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.03);
+    min-height: 480px;
+    container: columna / inline-size;   /* el encabezado reacciona al ancho de SU columna */
+  }
+
+  /* Cabecera de Columna */
+  .col-header {
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: .5rem;
+    margin-bottom: 1.75rem;
+  }
+  .col-header > .dropdown { flex: none; }
+  .col-title-group {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .col-title-group > .status-icon-circle, .col-title-group > .col-badge { flex: none; }
+  .status-icon-circle {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+    font-size: 1rem;
+  }
+  .icon-proceso { background-color: #fd7e14; }
+  .icon-terminado { background-color: #28a745; }
+  .icon-entregado { background-color: #0084ff; }
+
+  .col-title {
+    font-weight: 700;
+    font-size: 1.2rem;
+    color: #1a1a1a;
+    margin: 0;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .col-badge {
+    display: inline-block; min-width: 1.6rem; padding: .1rem .5rem; border-radius: 999px;
+    background: #e4e9f0; color: #3b4250; font-size: .8rem; font-weight: 700; text-align: center; line-height: 1.4;
+  }
+  .entregados-mas { text-align: center; color: #8a94a6; font-size: .85rem; padding: .75rem 0; min-height: 1px; }
+  .entregados-mas:empty { padding: 0; }
+
+  .btn-filter-pill {
+    background-color: #b0b7be;
+    color: #ffffff;
+    border: none;
+    border-radius: var(--ac-pill-radius);
+    padding: 0.25rem 1rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  .btn-filter-pill:hover {
+    opacity: 0.85;
+    color: #ffffff;
+  }
+  .btn-filter-pill { white-space: nowrap; }
+  .btn-filter-pill .filtro-icono { display: none; }
+  /* Si "Filtrar" no cabe junto al título, queda solo el ícono */
+  @container columna (max-width: 300px) {   /* ancho útil de la columna (sin su relleno) */
+    .btn-filter-pill { width: 36px; height: 36px; padding: 0; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; }
+    .btn-filter-pill::after { display: none; }
+    .btn-filter-pill .filtro-texto { display: none; }
+    .btn-filter-pill .filtro-icono { display: inline; }
+  }
+
+  /* Tarjetas de Pedido */
+  .pedido-card {
+    background: #ffffff;
+    border: 1px solid #eaedf1;
+    border-radius: 16px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.25rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+    position: relative;
+    transition: transform 0.15s ease;
+  }
+  .pedido-card:hover {
+    transform: translateY(-2px);
+  }
+  @keyframes tarjeta-actualizada {
+    from { background-color: #fff3cd; }
+    to { background-color: #ffffff; }
+  }
+  .pedido-card.tarjeta-actualizada { animation: tarjeta-actualizada 2s ease-out; }
+  .btn-ticket { border: 1px solid #ced4da; background: #fff; color: #495057; border-radius: 30px; padding: .5rem .9rem; }
+  .btn-ticket:hover { border-color: var(--ac-blue); color: var(--ac-blue); }
+  .acc-sec.acc-sec-cobrar.activo {
+    border-color: var(--ac-blue);
+    background: #eaf3ff;
+    color: #0b5ed7;
+  }
+
+  .btn-action-blue {
+    background-color: var(--ac-blue);
+    color: #ffffff;
+    border-radius: var(--ac-pill-radius);
+    padding: 0.2rem 1.35rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    border: none;
+    text-decoration: none;
+    display: inline-block;
+    margin-bottom: 0.5rem;
+  }
+  .btn-action-blue:hover {
+    background-color: #0070da;
+    color: #ffffff;
+  }
+
+  .info-label {
+    color: #8c939b;
+    font-size: 0.82rem;
+    margin-bottom: 0.15rem;
+  }
+  .info-value {
+    color: #212529;
+    font-weight: 700;
+    font-size: 0.95rem;
+  }
+
+  .badge-payment {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.2rem 0.65rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+  .badge-payment.pagado {
+    border: 1px solid var(--badge-green);
+    color: var(--badge-green);
+    background: #f1fbf4;
+  }
+  .badge-payment.anticipo {
+    border: 1px solid var(--badge-dark);
+    color: var(--badge-dark);
+    background: #f8f9fa;
+  }
+  .badge-payment.sin-pagar {
+    border: 1px solid var(--badge-red);
+    color: var(--badge-red);
+    background: #fdf3f3;
+  }
+
+  .folio-text {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #495057;
+    margin-top: 0.35rem;
+    margin-bottom: 0.35rem;
+  }
+
+  .avatar-resp-pill {
+    width: 30px;
+    height: 30px;
+    background-color: #00d2c4;
+    color: #ffffff;
+    border-radius: 50%;
+    padding: 0;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    flex: 0 0 30px;
+  }
+  img.avatar-resp-pill {
+    object-fit: cover;
+    background: #eef5fb;
+  }
+  .resp-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    justify-content: flex-end;
+  }
+
+  /* Cliente y descripción en la tarjeta */
+  .cliente-nombre {
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: #212529;
+  }
+  .descripcion-pedido {
+    font-size: 0.85rem;
+    color: #6c757d;
+    display: -webkit-box;
+    line-clamp: 2;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .btn-status-transition {
+    background-color: var(--btn-yellow);
+    color: #ffffff;
+    border: none;
+    border-radius: var(--ac-pill-radius);
+    padding: 0.55rem;
+    font-weight: 700;
+    font-size: 0.95rem;
+    width: 100%;
+    margin-top: 0.75rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.4rem;
+    transition: filter 0.2s;
+  }
+  .btn-status-transition:hover {
+    filter: brightness(0.95);
+    color: #ffffff;
+  }
+
+
+   
+    /* Tarjeta compacta */
+  .pedido-card { padding: .7rem 1rem .35rem; margin-bottom: .75rem; border-radius: 14px; }
+  .pc-grid { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; row-gap: .15rem; column-gap: .75rem; }
+  .pc-folio  { grid-column: 1; min-width: 0; font-weight: 700; font-size: 1rem; color: #212529; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pc-badge  { grid-column: 2; justify-self: end; max-width: 100%; white-space: nowrap; }
+  .pc-cliente, .pc-producto { grid-column: 1 / -1; font-size: .82rem; color: #6c757d; min-width: 0; }
+  .pc-cliente { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-transform: uppercase; }
+  .pc-producto { display: flex; align-items: baseline; gap: .35rem; }
+  .pc-producto-txt { flex: 0 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pc-producto-mas { flex: none; color: #6c757d; font-weight: 600; }
+  .pc-fecha  { grid-column: 1; min-width: 0; font-size: .88rem; font-weight: 600; color: #212529; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pc-fecha i { color: #8c939b; margin-right: .4rem; }
+  .pc-fecha.pc-vencido, .pc-fecha.pc-vencido i { color: #dc3545; }
+  .pc-fecha.pc-hoy, .pc-fecha.pc-hoy i { color: #d97706; }
+  .pc-fecha.pc-gris, .pc-fecha.pc-gris i { color: #6c757d; }
+  /* Avatares en su propio espacio (columna 2), agrupados y superpuestos: nunca tapan el texto */
+  .pc-resp   { grid-column: 2; justify-self: end; flex-wrap: nowrap; gap: 0; }
+  .pc-resp > .avatar-resp-pill + .avatar-resp-pill { margin-left: -8px; }
+  .pc-resp > .avatar-resp-pill { box-shadow: 0 0 0 2px #fff; }
+  .pedido-card.pc-entregado { padding: .45rem .85rem .25rem; margin-bottom: .5rem; }
+  .pedido-card.pc-entregado .pc-grid { row-gap: 0; }
+  .badge-payment { padding: .12rem .5rem; font-size: .75rem; }
+
+  .btn-expandir { display: block; width: 100%; background: none; border: none; color: #adb5bd;
+                  padding: 0; line-height: 1; font-size: .8rem; margin-top: .1rem; }
+  .btn-expandir:hover { color: var(--ac-blue); }
+  .btn-expandir i { display: inline-block; transition: transform .2s; }
+  .btn-expandir[aria-expanded="true"] i { transform: rotate(180deg); }
+
+  /* 1. Desenfoque suave sobre el fondo nativo de Bootstrap */
+.modal-backdrop {
+  background-color: rgba(15, 23, 42, 0.45) !important; /* Tinte oscuro tenue y moderno */
+  transition: opacity 0.2s linear !important;
+}
+
+.modal-backdrop.show {
+  opacity: 1 !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+}
+
+/* 2. Quitar el backdrop-filter directo de .modal para evitar superposición */
+.modal {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* 3. Suavizar la salida del modal para que desaparezca al unísono con el fondo */
+.modal.fade .modal-dialog {
+  transition: transform 0.2s ease-out, opacity 0.2s ease-out !important;
+}
+
+  .btn-whatsapp { display: inline-flex; align-items: center; gap: .4rem; background: #25d366; color: #fff;
+                  border-radius: 999px; padding: .25rem .85rem; font-weight: 600; font-size: .85rem; text-decoration: none; }
+  .btn-whatsapp:hover { background: #1ebe5b; color: #fff; }
+
+  /* Producción (modo columnas): las columnas sin tarjetas se ocultan y las visibles se reparten el ancho con grid.
+     La clase se alterna desde JS (columnasProduccion); la columna sigue en el DOM para que la sincronización inserte en ella.
+     Modo pestañas: una columna a la vez (ver más abajo). */
+  html[data-modo="columnas"] .kanban-produccion { display: grid; grid-template-columns: var(--cols, repeat(4, minmax(284px, 1fr))); transition: grid-template-columns .2s ease; overflow-x: auto; }
+  html[data-modo="columnas"] .kanban-produccion > .columna-kanban {
+    width: auto; max-width: none; min-width: 0; overflow: hidden;
+    transition: opacity .2s ease, padding .2s ease, visibility .2s;
+  }
+  html[data-modo="columnas"] .kanban-produccion > .columna-kanban.columna-oculta {
+    opacity: 0; visibility: hidden; pointer-events: none; padding-left: 0; padding-right: 0;
+  }
+
+  /* Pestañas de columnas (solo móvil) */
+  .kanban-tabs {
+    position: sticky; top: var(--kanban-tabs-top, 0); z-index: 1020;
+    display: none; gap: .4rem; padding: .5rem 0; margin-bottom: .5rem;
+    background-color: #f7f9fc;
+  }
+  .kanban-tab {
+    flex: 1 1 auto; min-width: 0; border: 1px solid #dfe3e8; border-radius: 999px;
+    background: #fff; color: #495057; font-weight: 600; font-size: .85rem;
+    padding: .5rem .4rem; min-height: 44px;
+    display: inline-flex; align-items: center; justify-content: center; gap: .35rem;
+  }
+  .kanban-tab span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .kanban-tab-conteo { background: #eef0f3; color: #495057; border-radius: 999px; padding: 0 .45rem; font-size: .75rem; }
+  .kanban-tab.active { background: var(--ac-blue); border-color: var(--ac-blue); color: #fff; }
+  .kanban-tab.active .kanban-tab-conteo { background: rgba(255,255,255,.25); color: #fff; }
+  .tablero-barra-filtro { display: none; }
+
+  .dashboard-quick-actions {
+    position: fixed;
+    right: max(1.5rem, env(safe-area-inset-right));
+    bottom: calc(1.5rem + env(safe-area-inset-bottom));
+    z-index: 1040;
+  }
+  /* Con barra inferior: por encima de ella (alto + su separación + aire) y respetando el área segura del iPhone */
+  html[data-modo="pestanas"] .dashboard-quick-actions {
+    right: max(1rem, env(safe-area-inset-right));
+    bottom: calc(var(--pf-tabbar-alto, 64px) + 1.75rem + env(safe-area-inset-bottom));
+  }
+  .dashboard-quick-trigger {
+    width: 58px;
+    height: 58px;
+    border: 0;
+    border-radius: 50%;
+    background: var(--ac-blue);
+    color: #fff;
+    box-shadow: 0 5px 18px rgba(0, 80, 160, .3);
+    font-size: 1.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform .2s, background-color .2s;
+  }
+  .dashboard-quick-trigger:hover { background: #0070da; }
+  .dashboard-quick-actions.is-open .dashboard-quick-trigger { transform: rotate(45deg); }
+  .dashboard-quick-menu {
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + .75rem);
+    display: none;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: .65rem;
+  }
+  .dashboard-quick-actions.is-open .dashboard-quick-menu { display: flex; }
+  .dashboard-quick-action {
+    display: inline-flex;
+    align-items: center;
+    gap: .55rem;
+    white-space: nowrap;
+    border: 0;
+    border-radius: 999px;
+    padding: .7rem 1rem;
+    background: #fff;
+    color: #212529;
+    font-weight: 650;
+    box-shadow: 0 3px 14px rgba(15, 23, 42, .16);
+  }
+  .dashboard-quick-action:hover { color: var(--ac-blue); }
+
+  /* Búsqueda en el historial. Rellenos y separación calculados para que cada tarjeta
+     mida y caiga igual que las de las columnas (.kanban-board > .col-md-4 > .kanban-col). */
+  .historial-enlace { margin: 0 0 1rem; text-align: center; }
+  .historial-enlace button { background: none; border: 0; padding: .25rem .5rem; color: var(--ac-blue); font-size: .85rem; }
+  .historial-enlace button:hover { text-decoration: underline; }
+  .historial-aviso-filtro { margin: 0 0 1rem; text-align: center; color: #495057; font-size: .88rem; }
+  .historial {
+    margin: 0 .25rem 1.5rem;
+    padding: 1.25rem 2rem .5rem;
+    background: var(--ac-card-bg);
+    border: 1px solid #eef0f3;
+    border-radius: var(--ac-border-radius);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.03);
+  }
+  .historial-titulo { font-weight: 700; font-size: 1.2rem; color: #1a1a1a; margin: 0 0 .75rem; }
+  .historial-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: calc(4rem + 2px); }
+  .historial-estado { color: #6c757d; font-size: .88rem; margin-bottom: .75rem; }
+  .etiqueta-historial { font-size: .68rem; padding: .1rem .5rem; margin-bottom: .35rem; }
+  .historial .card-pedido[data-estatus="Cancelado"] { opacity: .55; }
+
+  /* ===== Modo columnas: scroll normal de la página; navbar sticky; cada columna hace scroll interno.
+     Estructura: .kanban-board > .col-md-4.columna-kanban > .kanban-col > (.col-header + .contenedor-tarjetas) ===== */
+  html[data-modo="columnas"] body[data-blueprint="dashboard"] main.py-4 { padding-bottom: 0 !important; }
+  html[data-modo="columnas"] body[data-blueprint="dashboard"] .container-fluid { padding-bottom: 0; }
+  html[data-modo="columnas"] .container-fluid.sin-barra { padding-top: 0; }
+  html[data-modo="columnas"] .kanban-board.g-4 { --bs-gutter-y: 0; }
+  /* navbar → 32px → buscador → 20px → chips → 28px → tablero (cabecera sticky bajo la navbar) */
+  html[data-modo="columnas"] .cabecera-tablero {
+    display: block; position: sticky; top: var(--top-cabecera, 0px); z-index: 1020;
+    background: #f7f9fc; padding: 32px 0 28px;
+  }
+  html[data-modo="columnas"] .buscador-tablero { display: block; margin: 0 0 20px; }
+  html[data-modo="columnas"] .buscador-tablero:last-child { margin-bottom: 0; }
+  html[data-modo="columnas"] .buscador-tablero .pf-buscar { width: clamp(320px, 46%, 720px); max-width: none; margin: 0 auto; flex: none; }
+  html[data-modo="columnas"] .buscador-tablero .pf-buscar input {
+    height: 44px; background: #fff; border: 1px solid #ced4da;
+    padding: 0 2.8rem 0 1.2rem; box-shadow: 0 2px 8px rgba(15, 23, 42, .08);
+  }
+  html[data-modo="columnas"] .buscador-tablero .pf-buscar input:focus { border-color: #86b7fe; box-shadow: 0 0 0 .2rem rgba(29, 99, 237, .18); }
+  html[data-modo="columnas"] .buscador-tablero .pf-buscar > i { left: auto; right: 1.1rem; }
+  html[data-modo="columnas"] .buscador-tablero .historial-enlace,
+  html[data-modo="columnas"] .buscador-tablero .historial-aviso-filtro { margin: .5rem 0 0; }
+  html[data-modo="columnas"] .barra-resumen { margin: 0 1rem; gap: 12px; }
+  html[data-modo="columnas"] .chip-filtro { padding: 8px 16px; }
+  html[data-modo="columnas"] .kanban-board {
+    height: var(--alto-tablero, 80vh);
+    margin: 0 0 32px;
+    padding: 0 1rem;
+  }
+  html[data-modo="columnas"] .kanban-board > .columna-kanban { height: 100%; min-height: 0; }
+  html[data-modo="columnas"] .kanban-board > .columna-kanban > .kanban-col { height: 100%; display: flex; flex-direction: column; min-height: 0; }
+  html[data-modo="columnas"] .kanban-col > .col-header { flex: 0 0 auto; }
+  html[data-modo="columnas"] .kanban-col > .contenedor-tarjetas { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-anchor: none; }
+  html[data-modo="columnas"] .historial { max-height: 35dvh; overflow-y: auto; }
+
+  /* ===== Modo pestañas (lo decide pfModo en base.html; la barra inferior va con él) ===== */
+  html[data-modo="pestanas"] .container-fluid.px-4 { padding-left: .75rem !important; padding-right: .75rem !important; }
+  html[data-modo="pestanas"] .kanban-board > .columna-kanban { display: none; flex: 0 0 100%; width: 100%; max-width: 100%; }
+  html[data-modo="pestanas"] .kanban-board > .columna-kanban.tab-activa { display: block; }
+  html[data-modo="pestanas"] .kanban-tabs { display: flex; }
+  html[data-modo="pestanas"] .tab-largo { display: none; }
+  @media (min-width: 768px) {
+    html[data-modo="pestanas"] .tab-largo { display: inline; }
+    html[data-modo="pestanas"] .tab-corto { display: none; }
+  }
+  /* Pestañas compartidas por todos los roles */
+  html[data-modo="pestanas"] .kanban-tabs {
+    align-items: flex-end;
+    gap: 3px;
+    padding: 8px 0 0;
+    margin-bottom: 0;
+    overflow-x: hidden;
+    background: transparent;
+  }
+  html[data-modo="pestanas"] .kanban-tab {
+    min-height: 38px;
+    border: 0;
+    border-radius: 12px 12px 0 0;
+    background: #e7ebf0;
+    color: #697586;
+    padding: .42rem .28rem;
+    transform: translateY(4px);
+    transition: background-color .2s ease, color .2s ease, transform .2s ease;
+  }
+  html[data-modo="pestanas"] .kanban-tab.active {
+    min-height: 46px;
+    background: #fff;
+    color: #212529;
+    transform: translateY(0);
+    box-shadow: 0 -2px 8px rgba(15, 23, 42, .04);
+  }
+  html[data-modo="pestanas"] .kanban-tab-conteo {
+    min-width: 20px;
+    background: #6c7a96;
+    color: #fff;
+    text-align: center;
+  }
+  html[data-modo="pestanas"] .kanban-tab[data-tab="en-proceso"] .kanban-tab-conteo,
+  html[data-modo="pestanas"] .kanban-tab[data-tab="hoy"] .kanban-tab-conteo { background: #fd7e14; }
+  html[data-modo="pestanas"] .kanban-tab[data-tab="terminado"] .kanban-tab-conteo,
+  html[data-modo="pestanas"] .kanban-tab[data-tab="terminados-hoy"] .kanban-tab-conteo { background: #28a745; }
+  html[data-modo="pestanas"] .kanban-tab[data-tab="entregado"] .kanban-tab-conteo { background: #0084ff; }
+  html[data-modo="pestanas"] .kanban-tab[data-tab="vencidos"] .kanban-tab-conteo { background: #dc3545; }
+  html[data-modo="pestanas"] .kanban-tab[data-tab="proximos"] .kanban-tab-conteo { background: #6c7a96; }
+  html[data-modo="pestanas"] .kanban-tab.active .kanban-tab-conteo { color: #fff; }
+  html[data-modo="pestanas"] .kanban-board { transition: opacity .2s ease, transform .2s ease; }
+  html[data-modo="pestanas"] .kanban-board > .columna-kanban.columna-cambio { animation: kanban-pestana-cambio .2s ease; }
+  @keyframes kanban-pestana-cambio {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  html[data-modo="pestanas"] .kanban-board > .columna-kanban {
+    height: auto;
+    min-height: 0;
+  }
+  html[data-modo="pestanas"] .kanban-board > .columna-kanban > .kanban-col {
+    border-radius: 0 0 18px 18px;
+    margin-top: 0;
+    position: relative;
+  }
+  html[data-modo="pestanas"] .kanban-col > .col-header { display: none; }
+  html[data-modo="pestanas"] .tablero-barra-filtro {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    height: 44px;
+    flex: 0 0 44px;
+    border-bottom: 1px solid #edf0f3;
+  }
+  html[data-modo="pestanas"] .tablero-filtro-icono {
+    width: 34px;
+    height: 34px;
+    border: 1px solid #dfe3e8;
+    border-radius: 50%;
+    background: #fff;
+    color: #697586;
+    padding: 0;
+  }
+  html[data-modo="pestanas"] .tablero-filtro-icono::after { display: none; }
+  html[data-modo="pestanas"] .tablero-barra-filtro + .contenedor-tarjetas { padding-top: 10px; }
+  .columna-color-en-proceso,
+  .columna-color-hoy,
+  .columna-color-vencidos { background-color: #fd7e14; }
+  .columna-color-terminado,
+  .columna-color-terminados-hoy { background-color: #28a745; }
+  .columna-color-entregado { background-color: #0084ff; }
+  .columna-color-proximos { background-color: #6c7a96; }
+  .columna-color-vencidos { background-color: #dc3545; }
+  html[data-modo="pestanas"] .historial-enlace { margin: .25rem 0 0; }
+  html[data-modo="pestanas"] .historial-aviso-filtro { margin: .25rem 0 .5rem; }
+  html[data-modo="pestanas"] .historial { margin: .5rem 0; padding: 1rem .75rem .25rem; }
+  html[data-modo="pestanas"] .historial-grid { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); column-gap: 1rem; }
+  html[data-modo="pestanas"] .kanban-board { padding: 0 0 7rem; }
+  html[data-modo="pestanas"] .barra-resumen { margin: 40px 0 20px; justify-content: center; gap: 12px; }   /* + .5rem de relleno de las pestañas = 28px */
+  html[data-modo="pestanas"] .kanban-col { padding: 1rem .75rem; min-height: 0; }
+  html[data-modo="pestanas"] .pedido-card { width: 100%; }
+  html[data-modo="pestanas"] .container-fluid.sin-barra { padding-top: 40px; }
+  html[data-modo="pestanas"] .buscador-tablero { display: none; }
+</style>
+{% if puede('pedidos.gestionar') %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/formulario_pedido.css') }}">
+{% endif %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/tarjeta_pedido.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4{% if not puede('caja.ver') %} sin-barra{% endif %}">
+
+  {# Escritorio: el buscador (y su aviso de historial) se colocan aquí una sola vez al cargar. #}
+  <div class="cabecera-tablero" id="cabeceraTablero">
+  <div class="buscador-tablero" id="buscadorTablero"></div>
+
+  {# Solo con caja.ver (parte comercial). Producción no ve la barra: su filtro es "Solo mis pedidos" en cada
+     columna. El monto por cobrar se calcula en el servidor y solo existe aquí; nunca va en data-attributes. #}
+  {% if puede('caja.ver') %}
+  <div class="barra-resumen" id="contadoresTablero">
+    <span class="barra-fecha">{{ fecha_corta }}</span>
+    <button type="button" title="Clic para filtrar" class="chip-filtro" data-contador="vencido" aria-pressed="false"><span class="chip-punto rojo"></span><b class="chip-num">0</b> vencidos</button>
+    <button type="button" title="Clic para filtrar" class="chip-filtro" data-contador="hoy" aria-pressed="false"><span class="chip-punto ambar"></span><b class="chip-num">0</b> para hoy</button>
+    <button type="button" title="Clic para filtrar" class="chip-filtro azul" data-contador="recoger" aria-pressed="false"><b class="chip-num">0</b> por recoger · $<span id="chipPorCobrar">{{ '{:,.2f}'.format(por_cobrar or 0) }}</span> por cobrar</button>
+    <button type="button" title="Clic para filtrar" class="chip-filtro" data-contador="sin-pagar" aria-pressed="false"><b class="chip-num">0</b> sin pagar</button>
+  </div>
+  {% endif %}
+  </div>
+
+  <div class="historial-enlace" id="historialEnlace" hidden>
+    <button type="button" id="historialForzar">Buscar también en el historial</button>
+  </div>
+  <div class="historial-aviso-filtro" id="historialAvisoFiltro" role="status" hidden>
+    <span id="historialAvisoFiltroTexto"></span>
+    <button type="button" class="btn btn-sm btn-outline-secondary ms-2" id="historialQuitarFiltros">Quitar filtros</button>
+  </div>
+
+  <!-- Resultados de todo el historial (fuera de las columnas: la sincronización no mueve nada aquí) -->
+  <section class="historial" id="historialSeccion" data-url-historial="{{ url_for('dashboard.buscar') }}" hidden>
+    <h2 class="historial-titulo">Resultados del historial</h2>
+    <p class="historial-estado" id="historialEstado" aria-live="polite"></p>
+    <button type="button" class="btn btn-sm btn-outline-primary mb-3" id="historialBuscarProductos" hidden>Buscar también en productos</button>
+    <div class="historial-grid" id="historialTarjetas"></div>
+    <p class="historial-estado" id="historialHayMas" hidden>Mostrando 20 resultados, sé más específico</p>
+  </section>
+
+  {% from 'pedidos/_columnas_tablero.html' import tablero_columnas with context %}
+  {% if columnas_produccion %}
+    {{ tablero_columnas(columnas_produccion, 'produccion') }}
+  {% else %}
+    {% set columnas_estandar = namespace(items=[]) %}
+    {% set _ = columnas_estandar.items.append({'clave': 'en-proceso', 'titulo': 'En proceso', 'titulo_corto': 'En proceso', 'icono': 'bi-arrow-repeat', 'pedidos': en_proceso, 'plantilla': 'en_proceso', 'vacio': 'No hay pedidos en proceso.'}) %}
+    {% set _ = columnas_estandar.items.append({'clave': 'terminado', 'titulo': 'Terminado', 'titulo_corto': 'Terminado', 'icono': 'bi-clipboard-check', 'pedidos': terminados, 'plantilla': 'terminado', 'vacio': 'No hay pedidos terminados.'}) %}
+    {% set _ = columnas_estandar.items.append({'clave': 'entregado', 'titulo': 'Entregado', 'titulo_corto': 'Entregado', 'icono': 'bi-box-seam', 'pedidos': entregados, 'plantilla': 'entregado', 'vacio': 'No hay historial de entregados.'}) %}
+    {{ tablero_columnas(columnas_estandar.items, 'estandar') }}
+  {% endif %}
+  <script>
+  // Pestaña activa antes del primer pintado (la guardada, o la primera columna con tarjetas): sin parpadeo.
+  (function () {
+    try {
+      var cols = [].slice.call(document.querySelectorAll('.columna-kanban'));
+      var llena = function (c) { return !!c.querySelector('.card-pedido'); };
+      var hayProduccion = !!document.querySelector('.kanban-produccion');
+      var guardada = sessionStorage.getItem('dashboard_tab_activa');
+      var elegida = cols.filter(function (c) {
+        return c.dataset.col === guardada && (!hayProduccion || llena(c) || !cols.some(llena));
+      })[0] || (hayProduccion && cols.filter(llena)[0]) || cols[0];
+      if (!elegida) return;
+      cols.forEach(function (c) { c.classList.toggle('tab-activa', c === elegida); });
+      [].forEach.call(document.querySelectorAll('.kanban-tab'), function (t) {
+        t.classList.toggle('active', t.dataset.tab === elegida.dataset.col);
+      });
+    } catch (e) { /* sin almacenamiento: queda la primera */ }
+  })();
+  </script>
+</div>
+
+{% set puede_crear_nota = puede('pedidos.gestionar') %}
+{% set puede_crear_ticket = puede('caja.operar') %}
+{% if puede_crear_nota or puede_crear_ticket %}
+<div class="dashboard-quick-actions" id="dashboardQuickActions">
+  <div class="dashboard-quick-menu" id="dashboardQuickMenu" aria-hidden="true">
+    {% if puede_crear_nota %}
+    <button type="button" class="dashboard-quick-action" data-bs-toggle="modal" data-bs-target="#modalCrearNota">
+      <i class="bi bi-journal-plus"></i><span>Crear nota</span>
+    </button>
+    {% endif %}
+    {% if puede_crear_ticket %}
+    <button type="button" class="dashboard-quick-action" data-bs-toggle="modal" data-bs-target="#modalTicket">
+      <i class="bi bi-receipt"></i><span>Crear ticket</span>
+    </button>
+    {% endif %}
+  </div>
+  <button type="button" class="dashboard-quick-trigger" id="dashboardQuickTrigger"
+          aria-label="Acciones rápidas" aria-controls="dashboardQuickMenu" aria-expanded="false">
+    <i class="bi bi-plus-lg"></i>
+  </button>
+</div>
+
+{% if puede_crear_nota %}
+<div class="modal fade" id="modalCrearNota" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-pedido modal-fullscreen-lg-down">
+    <div class="modal-content border-0 bg-transparent">
+      <div class="modal-body p-0">
+        {% with pedido=None %}
+          {% include 'pedidos/_formulario_pedido.html' %}
+        {% endwith %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal único de edición: el formulario se inserta al presionar "Editar". -->
+<div class="modal fade" id="modalEditarPedido" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+  <div class="modal-dialog modal-dialog-centered modal-fullscreen-lg-down modal-pedido">
+    <div class="modal-content border-0 bg-transparent">
+      <div id="modalEditarPedidoContenido"></div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if puede_crear_ticket %}
+  {% include 'caja/_modal_ticket.html' %}
+{% endif %}
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/etiquetas.js') }}"></script>
+<script src="{{ url_for('static', filename='js/info_produccion.js') }}"></script>
+{% if puede('pedidos.gestionar') %}
+<script src="{{ url_for('static', filename='js/formulario_pedido.js') }}"></script>
+{% endif %}
+<script src="{{ url_for('static', filename='js/tablero_sync.js') }}" data-url-cambios="{{ url_for('dashboard.cambios') }}" data-url-entregados="{{ url_for('dashboard.entregados') }}"></script>
+<script>
+  // Filtros y Buscador del Tablero
+  function imprimirTicket(url) {
+    let f = document.getElementById('frame-ticket');
+    if (!f) {
+      f = document.createElement('iframe');
+      f.id = 'frame-ticket';
+      f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+      document.body.appendChild(f);
+    }
+    f.onload = () => {
+      if (f.contentWindow.location.href === 'about:blank') return;
+      f.contentWindow.focus();
+      f.contentWindow.print();
+    };
+    f.src = url;
+  }
+
+  // Edición bajo demanda: el formulario se pide al presionar "Editar" y usa un solo modal.
+  (function () {
+    const modal = document.getElementById('modalEditarPedido');
+    if (!modal) return;
+    const contenido = document.getElementById('modalEditarPedidoContenido');
+    const ERROR_CARGA = 'No se pudo abrir el pedido. Intenta de nuevo.';
+    let solicitud = null;
+
+    function mostrarCarga(boton, cargando) {
+      boton.disabled = cargando;
+      boton.querySelector('i').className = cargando ? 'spinner-border spinner-border-sm' : 'bi bi-pencil-square';
+    }
+
+    async function abrirEdicion(boton) {
+      solicitud?.abort();
+      const controlador = new AbortController();
+      solicitud = controlador;
+      mostrarCarga(boton, true);
+      try {
+        const respuesta = await fetch(boton.dataset.editarUrl, {
+          headers: { 'X-Requested-With': 'XMLHttpRequest' },
+          signal: controlador.signal,
+        });
+        if (respuesta.redirected) {   // sesión vencida: la guardia manda al login
+          location.href = respuesta.url;
+          return;
+        }
+        if (!respuesta.ok) {
+          const datos = await respuesta.json().catch(() => null);
+          alert(datos?.error || ERROR_CARGA);
+          return;
+        }
+        contenido.innerHTML = await respuesta.text();
+        contenido.querySelectorAll('script').forEach(script => {
+          const ejecutable = document.createElement('script');
+          [...script.attributes].forEach(atributo => {
+            ejecutable.setAttribute(atributo.name, atributo.value);
+          });
+          ejecutable.textContent = script.textContent;
+          script.replaceWith(ejecutable);
+        });
+        const formulario = contenido.querySelector('.tabla-productos-dinamica').closest('form');
+        window.inicializarFormularioPedido(formulario);
+        window.inicializarEdicionPedidoAjax?.(formulario);
+        bootstrap.Modal.getOrCreateInstance(modal).show();
+      } catch (error) {
+        if (error.name !== 'AbortError') alert(ERROR_CARGA);
+      } finally {
+        mostrarCarga(boton, false);
+        if (solicitud === controlador) solicitud = null;
+      }
+    }
+
+    document.addEventListener('click', evento => {
+      const boton = evento.target.closest('[data-editar-url]');
+      if (boton) abrirEdicion(boton);
+    });
+
+    modal.addEventListener('hidden.bs.modal', evento => {
+      if (evento.target !== modal) return;   // el modal de la nota va anidado y su evento burbujea
+      // Después del evento: los buscadores cierran sus sugerencias mirando el input aún en el DOM.
+      setTimeout(() => {
+        const form = contenido.querySelector('.tabla-productos-dinamica')?.closest('form');
+        if (form) window.destruirFormularioPedido(form);
+        contenido.innerHTML = '';
+      });
+    });
+  })();
+
+  document.addEventListener('DOMContentLoaded', function () {
+    const inputBusqueda = document.getElementById('buscadorGeneral');
+    const contenedorColumnas = document.querySelector('.kanban-board');
+
+    if (contenedorColumnas) {
+      function nuevoTokenEnvio() {
+        const datos = new Uint8Array(16);
+        crypto.getRandomValues(datos);
+        return Array.from(datos, byte => byte.toString(16).padStart(2, '0')).join('');
+      }
+      window.nuevoTokenEnvio ??= nuevoTokenEnvio;
+
+      function mostrarErrorPago(panel, mensaje) {
+        const error = panel.querySelector('[data-pago-error]');
+        error.textContent = mensaje;
+        error.hidden = false;
+      }
+
+      async function cobrarEfectivoSoloConfirmar(monto) {
+        const botonConfirmar = document.getElementById('efectivoConfirmar');
+        const tipoOriginal = botonConfirmar?.type;
+        if (botonConfirmar) botonConfirmar.type = 'button';
+        try {
+          return await window.cobrarEfectivo(monto);
+        } finally {
+          if (botonConfirmar?.isConnected && tipoOriginal) botonConfirmar.type = tipoOriginal;
+        }
+      }
+      window.cobrarEfectivoSoloConfirmar = cobrarEfectivoSoloConfirmar;
+
+      function cerrarPanelPago(card, panel) {
+        panel.hidden = true;
+        panel.classList.remove('abierto');
+        panel.querySelector('[data-pago-error]').hidden = true;
+        card.querySelector('[data-pago-abrir]')?.classList.remove('activo');
+        card.querySelector('[data-pago-abrir]')?.setAttribute('aria-expanded', 'false');
+        delete panel.dataset.tokenEnvio;
+      }
+
+      function actualizarResumenPago(panel) {
+        const saldo = Number(panel.dataset.saldo);
+        const campo = panel.querySelector('[data-pago-monto]');
+        const monto = campo.value.trim() ? Number(campo.value) : 0;
+        const pagoValido = Number.isFinite(monto) && monto > 0 && monto <= saldo;
+        const excedido = Number.isFinite(monto) && monto > saldo;
+        campo.classList.toggle('is-invalid', excedido);
+        campo.closest('.pedido-pago-cantidad')?.classList.toggle('is-invalid', excedido);
+        panel.querySelector('[data-pago-guardar]').disabled = !pagoValido;
+        const pago = Number.isFinite(monto) ? monto : 0;
+        panel.querySelector('[data-pago-resumen]').innerHTML = excedido
+          ? `Este pago <strong>$${pago.toFixed(2)}</strong> · <strong class="pedido-pago-maximo">Máximo $${saldo.toFixed(2)}</strong>`
+          : `Este pago <strong>$${pago.toFixed(2)}</strong> · Resta <strong class="pedido-pago-resta">$${(saldo - pago).toFixed(2)}</strong>`;
+      }
+
+      function limpiarMontoPago(campo) {
+        let valor = campo.value.replace(/[^\d.]/g, '');
+        const punto = valor.indexOf('.');
+        if (punto !== -1) {
+          valor = valor.slice(0, punto + 1) + valor.slice(punto + 1).replace(/\./g, '');
+        }
+        if (campo.value !== valor) campo.value = valor;
+      }
+
+      const reemplazosLocales = new WeakSet();
+      let ultimoPedidoActualizadoEnEsteNavegador = null;
+      function ignorarEcoPedido(idPedido, tarjeta) {
+        const reciente = {
+          idPedido: String(idPedido),
+          hora: Date.now(),
+          tarjeta: tarjeta.cloneNode(true),
+        };
+        ultimoPedidoActualizadoEnEsteNavegador = reciente;
+        setTimeout(() => {
+          if (ultimoPedidoActualizadoEnEsteNavegador === reciente) {
+            ultimoPedidoActualizadoEnEsteNavegador = null;
+          }
+        }, 3000);
+      }
+      window.ignorarEcoPedido = ignorarEcoPedido;
+
+      function reemplazarTarjeta(idPedido, html) {
+        const id = String(idPedido);
+        const actual = [...contenedorColumnas.querySelectorAll('.card-pedido')]
+          .find(tarjeta => tarjeta.dataset.idPedido === id);
+        if (!actual) return null;
+
+        const plantilla = document.createElement('template');
+        plantilla.innerHTML = html || '';
+        const raiz = plantilla.content.firstElementChild;
+        if (!raiz?.matches('.card-pedido') || raiz.dataset.idPedido !== id) return null;
+
+        const expandida = actual.classList.contains('expandida');
+        const columnaActual = actual.closest('.columna-kanban');
+        const scrollActual = columnaActual?.querySelector('.contenedor-tarjetas');
+        const columnaPorEstado = {
+          'En proceso': 'en-proceso',
+          Terminado: 'terminado',
+          Entregado: 'entregado',
+        };
+        const claveDestino = columnaPorEstado[raiz.dataset.estatus];
+        const columnaDestino = claveDestino
+          ? contenedorColumnas.querySelector(`.columna-kanban[data-col="${claveDestino}"]`)
+          : null;
+        const contenedorDestino = columnaDestino?.querySelector('.contenedor-tarjetas');
+        const scrollDestino = contenedorDestino;
+        const scrollActualTop = scrollActual?.scrollTop ?? 0;
+        const scrollActualLeft = scrollActual?.scrollLeft ?? 0;
+        const scrollDestinoTop = scrollDestino?.scrollTop ?? 0;
+        const scrollDestinoLeft = scrollDestino?.scrollLeft ?? 0;
+        const scrollX = window.scrollX;
+        const scrollY = window.scrollY;
+        const padre = actual.parentElement;
+
+        actual.outerHTML = html;
+        const nueva = [...padre.children].find(
+          tarjeta => tarjeta.matches('.card-pedido') && tarjeta.dataset.idPedido === id,
+        );
+        if (!nueva) return null;
+        if (contenedorDestino && contenedorDestino !== padre) {
+          contenedorDestino.appendChild(nueva);
+        }
+
+        if (expandida) {
+          nueva.classList.add('expandida');
+          nueva.querySelector('.card-extra')?.classList.add('show');
+          nueva.querySelector('.btn-expandir')?.setAttribute('aria-expanded', 'true');
+        }
+        reemplazosLocales.add(nueva);
+        if (scrollActual) {
+          scrollActual.scrollTop = scrollActualTop;
+          scrollActual.scrollLeft = scrollActualLeft;
+        }
+        if (scrollDestino && scrollDestino !== scrollActual) {
+          scrollDestino.scrollTop = scrollDestinoTop;
+          scrollDestino.scrollLeft = scrollDestinoLeft;
+        }
+        window.scrollTo(scrollX, scrollY);
+        return nueva;
+      }
+      window.reemplazarTarjeta = reemplazarTarjeta;
+
+      new MutationObserver(cambios => {
+        const tarjetasQuitadas = new Map();
+        const tarjetasAgregadas = [];
+        cambios.forEach(cambio => {
+          cambio.removedNodes.forEach(nodo => {
+            if (nodo.nodeType === Node.ELEMENT_NODE && nodo.matches('.card-pedido')) {
+              tarjetasQuitadas.set(nodo.dataset.idPedido, nodo);
+            }
+          });
+          cambio.addedNodes.forEach(nodo => {
+            if (nodo.nodeType === Node.ELEMENT_NODE && nodo.matches('.card-pedido')) {
+              tarjetasAgregadas.push(nodo);
+            }
+          });
+        });
+
+        tarjetasAgregadas.forEach(nueva => {
+          if (reemplazosLocales.has(nueva)) {
+            reemplazosLocales.delete(nueva);
+            return;
+          }
+          const idPedido = nueva.dataset.idPedido;
+          const anterior = tarjetasQuitadas.get(idPedido);
+          if (anterior === nueva) return;
+          if (anterior?.querySelector('[data-pago-panel]:not([hidden])')) {
+            reemplazarTarjeta(idPedido, anterior.outerHTML);
+            return;
+          }
+
+          const cobroReciente = ultimoPedidoActualizadoEnEsteNavegador;
+          if (
+            cobroReciente
+            && cobroReciente.idPedido === idPedido
+            && Date.now() - cobroReciente.hora < 3000
+          ) {
+            reemplazarTarjeta(idPedido, cobroReciente.tarjeta.outerHTML);
+          }
+        });
+        recalcularContadores();
+      }).observe(contenedorColumnas, { childList: true, subtree: true });
+
+      contenedorColumnas.addEventListener('click', async evento => {
+        const controlPago = evento.target.closest('[data-pago-control]');
+        if (controlPago) evento.preventDefault();
+
+        const abrir = evento.target.closest('[data-pago-abrir]');
+        if (abrir && contenedorColumnas.contains(abrir)) {
+          const card = abrir.closest('.card-pedido');
+          const panel = card.querySelector('[data-pago-panel]');
+          if (!panel) return;
+          if (!panel.hidden) {
+            cerrarPanelPago(card, panel);
+            return;
+          }
+          contenedorColumnas.querySelectorAll('[data-pago-panel]:not([hidden])').forEach(abierto => {
+            cerrarPanelPago(abierto.closest('.card-pedido'), abierto);
+          });
+          panel.hidden = false;
+          panel.classList.remove('abierto');
+          panel.dataset.tokenEnvio = nuevoTokenEnvio();
+          panel.querySelector('[data-pago-error]').hidden = true;
+          panel.querySelector('[data-pago-monto]').value = '';
+          panel.querySelector('[data-pago-metodo]').value = 'Efectivo';
+          panel.querySelectorAll('[data-pago-metodo-opcion]').forEach(opcion => {
+            const seleccionado = opcion.dataset.pagoMetodoOpcion === 'Efectivo';
+            opcion.classList.toggle('active', seleccionado);
+            opcion.setAttribute('aria-pressed', String(seleccionado));
+          });
+          actualizarResumenPago(panel);
+          abrir.classList.add('activo');
+          abrir.setAttribute('aria-expanded', 'true');
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              if (panel.hidden) return;
+              panel.classList.add('abierto');
+              panel.querySelector('[data-pago-monto]').focus({ preventScroll: true });
+            });
+          });
+          return;
+        }
+
+        const opcionMetodo = evento.target.closest('[data-pago-metodo-opcion]');
+        if (opcionMetodo && contenedorColumnas.contains(opcionMetodo) && !opcionMetodo.disabled) {
+          const panel = opcionMetodo.closest('[data-pago-panel]');
+          panel.querySelector('[data-pago-metodo]').value = opcionMetodo.dataset.pagoMetodoOpcion;
+          panel.querySelectorAll('[data-pago-metodo-opcion]').forEach(opcion => {
+            const seleccionado = opcion === opcionMetodo;
+            opcion.classList.toggle('active', seleccionado);
+            opcion.setAttribute('aria-pressed', String(seleccionado));
+          });
+          return;
+        }
+
+        const liquidar = evento.target.closest('[data-pago-liquidar]');
+        if (liquidar && contenedorColumnas.contains(liquidar)) {
+          const panel = liquidar.closest('[data-pago-panel]');
+          panel.querySelector('[data-pago-monto]').value = Number(panel.dataset.saldo).toFixed(2);
+          actualizarResumenPago(panel);
+          return;
+        }
+
+        const cancelar = evento.target.closest('[data-pago-cancelar]');
+        if (cancelar && contenedorColumnas.contains(cancelar)) {
+          const card = cancelar.closest('.card-pedido');
+          cerrarPanelPago(card, cancelar.closest('[data-pago-panel]'));
+          return;
+        }
+
+        const guardar = evento.target.closest('[data-pago-guardar]');
+        if (!guardar || !contenedorColumnas.contains(guardar) || guardar.disabled) return;
+        const card = guardar.closest('.card-pedido');
+        const panel = guardar.closest('[data-pago-panel]');
+        const campoMonto = panel.querySelector('[data-pago-monto]');
+        const metodo = panel.querySelector('[data-pago-metodo]').value;
+        const monto = Number(campoMonto.value);
+        const saldo = Number(panel.dataset.saldo);
+        if (!Number.isFinite(monto) || monto <= 0 || monto > saldo) {
+          mostrarErrorPago(panel, monto > saldo
+            ? `El monto excede el saldo restante ($${saldo.toFixed(2)}).`
+            : 'El monto a pagar debe ser mayor a 0.');
+          return;
+        }
+
+        const token = panel.dataset.tokenEnvio || nuevoTokenEnvio();
+        panel.dataset.tokenEnvio = token;
+        panel.querySelector('[data-pago-error]').hidden = true;
+        guardar.disabled = true;
+        try {
+          if (metodo === 'Efectivo') {
+            if (typeof window.cobrarEfectivo !== 'function') {
+              mostrarErrorPago(panel, 'No está disponible el cobro de efectivo.');
+              return;
+            }
+            const cobroEfectivo = await cobrarEfectivoSoloConfirmar(monto);
+            if (!cobroEfectivo) return;
+          }
+
+          const formData = new FormData();
+          formData.append('metodo', metodo);
+          formData.append('monto', monto.toFixed(2));
+          formData.append('token_envio', token);
+
+          let respuesta;
+          try {
+            respuesta = await fetch(`/pedidos/${card.dataset.idPedido}/pago`, {
+              method: 'POST',
+              body: formData,
+              headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            });
+          } catch {
+            mostrarErrorPago(panel, 'No se pudo conectar. Intenta guardar de nuevo.');
+            return;
+          }
+
+          panel.dataset.tokenEnvio = nuevoTokenEnvio();
+          const resultado = await respuesta.json().catch(() => null);
+          if (!respuesta.ok || !resultado?.ok) {
+            mostrarErrorPago(panel, resultado?.error || 'No se pudo registrar el cobro.');
+            return;
+          }
+
+          const plantilla = document.createElement('template');
+          plantilla.innerHTML = resultado.html || '';
+          const nuevaCard = plantilla.content.firstElementChild;
+          if (!nuevaCard?.matches('.card-pedido')) {
+            mostrarErrorPago(panel, 'La respuesta del servidor no contiene la tarjeta actualizada.');
+            return;
+          }
+
+          const tarjetaActualizada = reemplazarTarjeta(card.dataset.idPedido, resultado.html);
+          if (!tarjetaActualizada) {
+            mostrarErrorPago(panel, 'No se pudo reemplazar la tarjeta actualizada.');
+            return;
+          }
+          ignorarEcoPedido(card.dataset.idPedido, tarjetaActualizada);
+          window.actualizarFechasTarjetas?.([tarjetaActualizada]);
+          if (window.aplicarFiltrosTablero) window.aplicarFiltrosTablero();
+          else window.recalcularContadores?.();
+
+          const saldosTerminados = [...contenedorColumnas.querySelectorAll(
+            '.columna-kanban[data-col="terminado"] .card-pedido',
+          )].reduce((total, tarjeta) => total + (Number(tarjeta.dataset.saldo) || 0), 0);
+          window.actualizarPorCobrar?.(saldosTerminados);
+          window.recalcularContadores?.();
+        } catch (error) {
+          mostrarErrorPago(panel, error.message || 'No se pudo registrar el cobro.');
+        } finally {
+          if (guardar.isConnected) guardar.disabled = false;
+        }
+      });
+
+      contenedorColumnas.addEventListener('input', evento => {
+        const campo = evento.target.closest('[data-pago-monto]');
+        if (campo && contenedorColumnas.contains(campo)) {
+          limpiarMontoPago(campo);
+          actualizarResumenPago(campo.closest('[data-pago-panel]'));
+        }
+      });
+
+      contenedorColumnas.addEventListener('submit', evento => {
+        if (evento.target.querySelector('[data-pago-panel]')) evento.preventDefault();
+      });
+
+      contenedorColumnas.addEventListener('keydown', evento => {
+        const panel = evento.target.closest('[data-pago-panel]');
+        if (!panel || panel.hidden) return;
+        if (evento.key === 'Escape') {
+          evento.preventDefault();
+          panel.querySelector('[data-pago-cancelar]').click();
+        } else if (evento.key === 'Enter' && evento.target.matches('[data-pago-monto]')) {
+          evento.preventDefault();
+          const guardar = panel.querySelector('[data-pago-guardar]');
+          if (!guardar.disabled) guardar.click();
+        }
+      });
+    }
+
+    function normalizar(texto) {
+      return (texto || '')
+        .toString()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .trim();
+    }
+
+    // Búsqueda en todo el historial cuando el tablero no alcanza
+    const ocultasPorFiltro = new WeakSet();   // la deja aplicarFiltros: pago, fecha o responsable
+    const historial = (function () {
+      const ESPERA_TECLEO_MS = 400;
+      const MIN_CARACTERES = 2;
+      const FORMA_FOLIO = /^[A-Za-z]{0,4}[0-9]{3,}$/;
+      const avisoFiltro = document.getElementById('historialAvisoFiltro');
+      const avisoFiltroTexto = document.getElementById('historialAvisoFiltroTexto');
+      const seccion = document.getElementById('historialSeccion');
+      const enlace = document.getElementById('historialEnlace');
+      const estado = document.getElementById('historialEstado');
+      const avisoHayMas = document.getElementById('historialHayMas');
+      const botonProductos = document.getElementById('historialBuscarProductos');
+      let temporizador = null;
+      let controlador = null;
+      let consultado = null;     // término ya pedido: filtros y sincronización no lo repiten
+      let forzadoPara = null;    // término con búsqueda completa pedida desde el enlace
+
+      function detener() {
+        clearTimeout(temporizador);
+        controlador?.abort();
+        controlador = null;
+      }
+
+      function mostrarEstado(texto) {
+        estado.textContent = texto;
+        estado.hidden = !texto;
+      }
+
+      function cerrar() {
+        detener();
+        consultado = null;
+        window.vaciarHistorial();
+        seccion.hidden = true;
+      }
+
+      async function consultar(termino, modo) {
+        const actual = new AbortController();
+        controlador = actual;
+        const excluir = [...document.querySelectorAll('.columna-kanban .card-pedido')]
+          .map(tarjeta => tarjeta.dataset.idPedido).join(',');
+        const parametros = new URLSearchParams({ q: termino, modo, excluir });
+        try {
+          const respuesta = await fetch(`${seccion.dataset.urlHistorial}?${parametros}`, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }, cache: 'no-store', signal: actual.signal,
+          });
+          if (respuesta.redirected) {   // sesión vencida: al recargar, la guardia manda al login
+            location.reload();
+            return;
+          }
+          if (!respuesta.ok) throw new Error(`HTTP ${respuesta.status}`);
+          const datos = await respuesta.json();
+          if (actual !== controlador) return;
+          window.pintarHistorial(datos.tarjetas);
+          const sinResultados = datos.tarjetas.length === 0;
+          const textoVacio = modo === 'auto'
+            ? 'Sin coincidencias por folio, cliente o teléfono.'   // en auto no se buscó en productos
+            : 'Sin resultados en el historial';
+          mostrarEstado(sinResultados ? textoVacio : '');
+          botonProductos.hidden = !(sinResultados && modo === 'auto');
+          avisoHayMas.hidden = !datos.hay_mas;
+        } catch (error) {
+          if (error.name === 'AbortError' || actual !== controlador) return;
+          mostrarEstado('No se pudo buscar en el historial. Intenta de nuevo.');
+        }
+      }
+
+      function programar(termino, espera, modo) {
+        detener();
+        consultado = termino;
+        window.vaciarHistorial();
+        avisoHayMas.hidden = true;
+        botonProductos.hidden = true;
+        mostrarEstado('Buscando en el historial…');
+        seccion.hidden = false;
+        temporizador = setTimeout(() => consultar(termino, modo), espera);
+      }
+
+      // Tarjetas cargadas con ese folio exacto; "1234" también vale para "AC1234".
+      function tarjetasConFolio(termino) {
+        const buscado = termino.toLowerCase();
+        const numero = /^[0-9]+$/.test(buscado) ? buscado.replace(/^0+/, '') : null;
+        return [...document.querySelectorAll('.columna-kanban .card-pedido')].filter(tarjeta => {
+          const folio = tarjeta.dataset.folio;
+          if (folio === buscado) return true;
+          return !!numero && (folio.match(/[0-9]+$/)?.[0] || '').replace(/^0+/, '') === numero;
+        });
+      }
+
+      function actualizar(hayVisibles) {
+        const termino = inputBusqueda.value.trim();
+        const valido = normalizar(termino).length >= MIN_CARACTERES;
+        enlace.hidden = !valido;
+        if (termino !== forzadoPara) forzadoPara = null;
+
+        const formaFolio = FORMA_FOLIO.test(termino);
+        const conFolio = formaFolio ? tarjetasConFolio(termino) : [];
+        const ocultoPorFiltro = conFolio.length > 0 && conFolio.every(t => ocultasPorFiltro.has(t));
+        avisoFiltro.hidden = !ocultoPorFiltro;
+        if (ocultoPorFiltro) {
+          const folio = conFolio[0].querySelector('.pc-folio').textContent.trim();
+          avisoFiltroTexto.textContent = `El pedido ${folio} está en el tablero, pero un filtro lo oculta`;
+        }
+
+        const folioNoCargado = formaFolio && conFolio.length === 0;
+        if (!valido || ((hayVisibles || ocultoPorFiltro) && forzadoPara === null && !folioNoCargado)) {
+          if (consultado !== null || !seccion.hidden) cerrar();
+          return;
+        }
+        if (termino !== consultado) programar(termino, ESPERA_TECLEO_MS, 'auto');
+      }
+
+      document.getElementById('historialQuitarFiltros').addEventListener('click', () => {
+        document.querySelectorAll('.filtro-pago, .filtro-fecha, .filtro-responsable').forEach(select => {
+          select.value = 'todos';
+        });
+        contadorActivo = null;
+        aplicarFiltros();
+      });
+
+      function buscarCompleto() {
+        forzadoPara = inputBusqueda.value.trim();
+        programar(forzadoPara, 0, 'completo');
+      }
+      document.getElementById('historialForzar').addEventListener('click', buscarCompleto);
+      botonProductos.addEventListener('click', buscarCompleto);
+
+      return { actualizar };
+    })();
+
+    // ---- Contadores del tablero (se calculan con las tarjetas cargadas) ----
+    const contenedorContadores = document.getElementById('contadoresTablero');
+    let contadorActivo = null;
+
+    function fechaLocal(d) {
+      return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-');
+    }
+
+    // Contador de llamadas por minuto (solo en modo DEBUG; ver base.html). Verifica que los pasos de rendimiento no rompan nada.
+    const contar = nombre => window.pfContar?.(nombre);
+
+    // Datos normalizados de cada tarjeta, calculados una sola vez. Una tarjeta nueva es otro elemento,
+    // así que no hay nada que invalidar; solo el texto visible (fechas) cambia sobre el mismo elemento.
+    const cacheTarjetas = new WeakMap();
+    function datosTarjeta(tarjeta) {
+      let datos = cacheTarjetas.get(tarjeta);
+      if (!datos) {
+        const resp = normalizar(tarjeta.getAttribute('data-responsable'));
+        datos = {
+          folio: normalizar(tarjeta.getAttribute('data-folio')),
+          cliente: normalizar(tarjeta.getAttribute('data-cliente')),
+          telefono: normalizar(tarjeta.getAttribute('data-telefono')),
+          pago: normalizar(tarjeta.getAttribute('data-pago')),
+          fecha: normalizar(tarjeta.getAttribute('data-fecha')),
+          resp,
+          respLista: resp.split('|'),   // un pedido puede tener varios responsables separados por "|"
+          entregaMs: new Date(tarjeta.dataset.entrega).getTime(),
+          contenido: null,              // texto completo: solo se normaliza cuando hay búsqueda
+        };
+        cacheTarjetas.set(tarjeta, datos);
+      }
+      return datos;
+    }
+    function contenidoTarjeta(tarjeta) {
+      const datos = datosTarjeta(tarjeta);
+      if (datos.contenido === null) datos.contenido = normalizar(tarjeta.textContent);
+      return datos.contenido;
+    }
+
+    // Solo En proceso + Terminado cuentan; Entregado nunca.
+    function cumpleContador(tarjeta, clave, ahora) {
+      const estatus = tarjeta.dataset.estatus;
+      if (estatus !== 'En proceso' && estatus !== 'Terminado') return false;
+      switch (clave) {
+        case 'sin-pagar': return tarjeta.dataset.pago === 'sin pagar';
+        case 'vencido': return estatus === 'En proceso' && datosTarjeta(tarjeta).entregaMs < ahora.getTime();
+        case 'hoy': return tarjeta.dataset.fecha === fechaLocal(ahora);
+        case 'recoger': return estatus === 'Terminado';
+        default: return true;
+      }
+    }
+
+    // Oculta las columnas sin tarjetas para todos los roles.
+    const tableroProduccion = document.querySelector('.kanban-produccion');
+    const tableroPrincipal = document.querySelector('.kanban-board');
+    const enPestanas = () => document.documentElement.dataset.modo === 'pestanas';
+    const enColumnas = () => document.documentElement.dataset.modo === 'columnas';
+    // Cuántas columnas hay visibles ahora: pfModo lo consulta al cargar y al redimensionar.
+    window.pfModo?.fuenteColumnas(() => {
+      const tablero = tableroProduccion || tableroPrincipal;
+      if (!tablero) return 0;
+      const llenas = [...tablero.querySelectorAll(':scope > .columna-kanban')]
+        .map(c => !!c.querySelector('.contenedor-tarjetas > .card-pedido'));
+      const n = llenas.filter(Boolean).length;
+      return n || llenas.length;
+    });
+    function columnasProduccion() {
+      const tablero = tableroProduccion || tableroPrincipal;
+      if (!tablero) return;
+      const columnas = [...tablero.querySelectorAll(':scope > .columna-kanban')];
+      const llenas = columnas.map(c => !!c.querySelector('.contenedor-tarjetas > .card-pedido'));
+      const hayAlguna = llenas.some(Boolean);
+      const hayFiltroActivo = !!contadorActivo ||
+        [...document.querySelectorAll('.filtro-pago, .filtro-fecha, .filtro-responsable')]
+          .some(el => el.value && el.value !== 'todos');
+      columnas.forEach((c, i) => c.classList.toggle('columna-oculta',
+        !hayFiltroActivo && hayAlguna && !llenas[i]));
+      if (tableroProduccion) {
+        tableroProduccion.style.setProperty('--cols',
+          llenas.map(l => (l || !hayAlguna || hayFiltroActivo) ? 'minmax(284px, 1fr)' : 'minmax(0, 0fr)').join(' '));
+      }
+
+      // Aquí NO se cambia de modo (columnas ↔ pestañas): solo carga y redimensión lo reevalúan (pfModo).
+      // En modo columnas una columna nueva puede encoger hasta 260 px (ver --cols); en pestañas solo se agrega su pestaña.
+      if (!enPestanas()) return;
+      const contenedorTabs = document.querySelector('.kanban-tabs');
+      if (!contenedorTabs) return;
+      const tabsMovil = [...contenedorTabs.querySelectorAll('.kanban-tab')];
+      const sinTab = tabsMovil.find(t => t.dataset.tab === 'sin-pedidos');
+      if (!hayAlguna && !hayFiltroActivo) {
+        tabsMovil.forEach(t => { if (t !== sinTab) t.hidden = true; });
+        let vacio = sinTab;
+        if (!vacio) {
+          vacio = document.createElement('button');
+          vacio.type = 'button';
+          vacio.className = 'kanban-tab active';
+          vacio.dataset.tab = 'sin-pedidos';
+          vacio.setAttribute('role', 'tab');
+          vacio.innerHTML = '<span>Sin pedidos</span><span class="kanban-tab-conteo">0</span>';
+          contenedorTabs.appendChild(vacio);
+        }
+        vacio.hidden = false;
+        vacio.classList.add('active');
+        vacio.setAttribute('aria-selected', 'true');
+        columnas.forEach(c => c.classList.remove('tab-activa'));
+        return;
+      }
+      sinTab?.remove();
+      let siguienteActiva = null;
+      tabsMovil.forEach((tab, i) => {
+        if (tab.dataset.tab === 'sin-pedidos') return;
+        const llena = hayFiltroActivo ? true : llenas[i];
+        tab.hidden = !llena;
+        if (llena && !siguienteActiva) siguienteActiva = tab;
+      });
+      const activa = tabsMovil.find(t => t.classList.contains('active') && !t.hidden);
+      if (activa) siguienteActiva = activa;
+      if (!siguienteActiva) return;
+      tabsMovil.forEach(t => {
+        const esActiva = t === siguienteActiva;
+        t.classList.toggle('active', esActiva);
+        t.setAttribute('aria-selected', esActiva ? 'true' : 'false');
+      });
+      columnas.forEach(c => {
+        const esActiva = c.dataset.col === siguienteActiva.dataset.tab;
+        c.classList.toggle('tab-activa', esActiva);
+        if (esActiva) {
+          c.classList.remove('columna-cambio');
+          void c.offsetWidth;
+          c.classList.add('columna-cambio');
+        }
+      });
+    }
+
+    function recalcularContadores() {
+      contar('recalcularContadores');
+      columnasProduccion();
+      const ahora = new Date();
+      const tarjetas = [...document.querySelectorAll('.columna-kanban .card-pedido')];
+      if (!contenedorContadores) return;
+      contenedorContadores.querySelectorAll('.chip-filtro').forEach(boton => {
+        const clave = boton.dataset.contador;
+        boton.querySelector('.chip-num').textContent =
+          tarjetas.filter(t => cumpleContador(t, clave, ahora)).length;
+        boton.classList.toggle('activo', clave === contadorActivo);
+        boton.setAttribute('aria-pressed', clave === contadorActivo);
+      });
+    }
+    window.recalcularContadores = recalcularContadores;
+
+    // Monto por cobrar (suma de saldos de Terminado): lo calcula el servidor y llega con /cambios.
+    window.actualizarPorCobrar = monto => {
+      const el = document.getElementById('chipPorCobrar');
+      if (el && typeof monto === 'number') {
+        el.textContent = monto.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+    };
+
+    if (contenedorContadores) {
+      contenedorContadores.addEventListener('click', evento => {
+        const boton = evento.target.closest('.chip-filtro');
+        if (!boton) return;
+        contadorActivo = contadorActivo === boton.dataset.contador ? null : boton.dataset.contador;
+        aplicarFiltros();
+      });
+    }
+
+    // El buscador espera 150 ms tras la última tecla (el espejo móvil de base.html dispara este mismo evento).
+    let temporizadorFiltros = null;
+    function aplicarFiltrosDiferido() {
+      clearTimeout(temporizadorFiltros);
+      temporizadorFiltros = setTimeout(aplicarFiltros, 150);
+    }
+
+    function aplicarFiltros() {
+      clearTimeout(temporizadorFiltros);   // una ejecución inmediata cancela la pendiente
+      contar('aplicarFiltros');
+      const termino = normalizar(inputBusqueda ? inputBusqueda.value : '');
+      let hayVisibles = false;
+      // Fecha local, calculada aquí porque la página ya no se recarga al cambiar de día
+      const ahora = new Date();
+      const hoyStr = fechaLocal(ahora);
+
+      document.querySelectorAll('.columna-kanban').forEach(columna => {
+        const filtroPagoEl = columna.querySelector('.filtro-pago');
+        const filtroFechaEl = columna.querySelector('.filtro-fecha');
+        const filtroRespEl = columna.querySelector('.filtro-responsable');
+
+        const filtroPago = normalizar(filtroPagoEl ? filtroPagoEl.value : 'todos');
+        const filtroFecha = normalizar(filtroFechaEl ? filtroFechaEl.value : 'todos');
+        const filtroResp = normalizar(filtroRespEl ? filtroRespEl.value : 'todos');
+
+        const tarjetas = columna.querySelectorAll('.card-pedido');
+        let tarjetasVisibles = 0;
+
+        tarjetas.forEach(tarjeta => {
+          const datos = datosTarjeta(tarjeta);
+
+          // El texto completo solo se normaliza (y se guarda) cuando hay algo que buscar.
+          const coincideBusqueda = !termino ||
+                                   datos.folio.includes(termino) ||
+                                   datos.cliente.includes(termino) ||
+                                   datos.telefono.includes(termino) ||
+                                   datos.resp.includes(termino) ||
+                                   contenidoTarjeta(tarjeta).includes(termino);
+
+          const coincidePago = (filtroPago === 'todos') || (datos.pago === filtroPago);
+          const coincideResp = (filtroResp === 'todos') || datos.respLista.includes(filtroResp);
+
+          let coincideFecha = true;
+          if (filtroFecha === 'hoy') {
+            coincideFecha = (datos.fecha === hoyStr);
+          }
+
+          const coincideContador = !contadorActivo ||
+                                   cumpleContador(tarjeta, contadorActivo, ahora);
+
+          if (coincidePago && coincideFecha && coincideResp && coincideContador) ocultasPorFiltro.delete(tarjeta);
+          else ocultasPorFiltro.add(tarjeta);
+
+          if (coincideBusqueda && coincidePago && coincideFecha && coincideResp && coincideContador) {
+            tarjeta.style.display = '';
+            tarjetasVisibles++;
+          } else {
+            tarjeta.style.display = 'none';
+          }
+        });
+
+        // Entregado solo carga una parte: sin filtros muestra el total real del servidor
+        // y con filtros lo visible ("12+" si aún faltan por cargar).
+        let textoConteo = String(tarjetasVisibles);
+        if (columna.dataset.col === 'entregado') {
+          const contenedor = columna.querySelector('.contenedor-tarjetas');
+          const hayMas = contenedor.dataset.hayMas === '1';
+          const filtrado = !!termino || contadorActivo ||
+            filtroPago !== 'todos' || filtroFecha !== 'todos' || filtroResp !== 'todos';
+          textoConteo = filtrado ? tarjetasVisibles + (hayMas ? '+' : '') : (contenedor.dataset.total || '0');
+        }
+        const badge = columna.querySelector('.col-badge');
+        if (badge) badge.textContent = textoConteo;
+        const conteoTab = document.querySelector(`.kanban-tab[data-tab="${columna.dataset.col}"] .kanban-tab-conteo`);
+        if (conteoTab) conteoTab.textContent = textoConteo;
+        if (tarjetasVisibles > 0) hayVisibles = true;
+
+        let aviso = columna.querySelector('.mensaje-sin-coincidencias');
+        if (tarjetasVisibles === 0 && tarjetas.length > 0) {
+          if (!aviso) {
+            aviso = document.createElement('p');
+            aviso.className = 'text-center text-muted small my-3 mensaje-sin-coincidencias';
+            aviso.textContent = 'Sin resultados.';
+            columna.querySelector('.contenedor-tarjetas').appendChild(aviso);
+          }
+          aviso.style.display = '';
+        } else if (aviso) {
+          aviso.style.display = 'none';
+        }
+      });
+
+      recalcularContadores();
+      if (inputBusqueda) historial.actualizar(hayVisibles);
+    }
+
+    window.aplicarFiltrosTablero = aplicarFiltros;
+
+    if (inputBusqueda) {
+      inputBusqueda.addEventListener('input', aplicarFiltrosDiferido);
+    }
+
+    document.querySelectorAll('.filtro-pago, .filtro-fecha, .filtro-responsable').forEach(select => {
+      select.addEventListener('change', aplicarFiltros);
+    });
+    // Fecha compacta según urgencia; se recalcula tras cada sincronización y cada minuto
+    function hm(d) {
+      const h = d.getHours() % 12 || 12, m = d.getMinutes();
+      return h + (m ? ':' + String(m).padStart(2, '0') : '') + (d.getHours() < 12 ? 'am' : 'pm');
+    }
+    function dm(d) { return String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0'); }
+    // Sin argumentos recorre todo el tablero; con una lista, solo esas tarjetas (las que acaban de llegar).
+    function actualizarFechasTarjetas(tarjetas) {
+      contar('actualizarFechasTarjetas');
+      const ahora = new Date();
+      const hoy0 = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
+      const dias = d => Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - hoy0) / 86400000);
+      (tarjetas || document.querySelectorAll('.pedido-card')).forEach(t => {
+        const el = t.querySelector('.pc-fecha'), txt = t.querySelector('.pc-fecha-txt');
+        if (!el || !txt) return;
+        const estatus = t.dataset.estatus;
+        let texto, clase = '';
+        if (estatus === 'Cancelado') {
+          texto = 'Cancelado · ' + dm(new Date(t.dataset.orden)); clase = 'pc-gris';
+        } else if (estatus === 'Entregado') {
+          const d = new Date(t.dataset.entregado);
+          texto = dm(d) + ' ' + hm(d); clase = 'pc-gris';
+        } else if (estatus === 'Terminado') {
+          const n = Math.max(0, -dias(new Date(t.dataset.terminado)));
+          texto = n === 0 ? 'Terminado hoy' : 'Esperando ' + n + (n === 1 ? ' día' : ' días');
+          if (n >= 7) clase = 'pc-vencido';
+        } else {
+          const d = new Date(t.dataset.orden), n = dias(d);
+          if (d < ahora) { texto = 'Vencido · ' + dm(d) + ' ' + hm(d); clase = 'pc-vencido'; }
+          else if (n === 0) { texto = 'Hoy · ' + hm(d); clase = 'pc-hoy'; }
+          else if (n === 1) texto = 'Mañana · ' + hm(d);
+          else texto = dm(d) + ' ' + hm(d);
+        }
+        if (txt.textContent !== texto) {
+          txt.textContent = texto;
+          const datos = cacheTarjetas.get(t);
+          if (datos) datos.contenido = null;   // el texto de la tarjeta cambió: se vuelve a normalizar si hay búsqueda
+        }
+        el.classList.remove('pc-vencido', 'pc-hoy', 'pc-gris');
+        if (clase) el.classList.add(clase);
+      });
+    }
+    window.actualizarFechasTarjetas = actualizarFechasTarjetas;
+    actualizarFechasTarjetas();
+
+    // Cada minuto: fechas y chips ("Vencido" depende de la hora). En segundo plano no corre;
+    // al volver a estar visible se pone al día de inmediato.
+    let temporizadorMinuto = null;
+    // Producción: las columnas dependen del día. Si la página sigue abierta al cambiar de fecha, recarga completa.
+    // Se compara contra la fecha local al cargar (no contra la del servidor), así un desfase de zona no recarga en bucle.
+    const diaAlCargar = fechaLocal(new Date());
+    const columnasPorFecha = !!document.querySelector('.columna-kanban[data-col="vencidos"]');
+    function pasoDeMinuto() {
+      if (columnasPorFecha && fechaLocal(new Date()) !== diaAlCargar) {
+        location.reload();
+        return;
+      }
+      actualizarFechasTarjetas();
+      recalcularContadores();
+    }
+    function programarMinuto() {
+      clearInterval(temporizadorMinuto);
+      temporizadorMinuto = document.hidden ? null : setInterval(pasoDeMinuto, 60000);
+    }
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        clearInterval(temporizadorMinuto);
+        temporizadorMinuto = null;
+      } else {
+        pasoDeMinuto();
+        programarMinuto();
+      }
+    });
+    programarMinuto();
+
+    aplicarFiltros();   // badges iniciales (también recalcula los chips)
+
+    // Modo columnas: los avisos de historial van bajo la navbar (cabecera fija); en pestañas, sobre los resultados.
+    (function () {
+      const destino = document.getElementById('buscadorTablero');
+      const input = document.getElementById('buscadorGeneral');
+      const resultados = document.getElementById('historialSeccion');
+      function colocarAvisos() {
+        ['historialEnlace', 'historialAvisoFiltro'].forEach(id => {
+          const el = document.getElementById(id);
+          if (!el || !destino || !resultados) return;
+          if (enColumnas()) destino.appendChild(el);
+          else resultados.before(el);
+        });
+      }
+      colocarAvisos();
+      window.addEventListener('pfmodo', colocarAvisos);
+      // "/" enfoca el buscador
+      document.addEventListener('keydown', e => {
+        if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented || !input || !input.offsetParent) return;
+        const a = document.activeElement;
+        if (a && (a.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))) return;
+        if (document.body.classList.contains('modal-open') || document.querySelector('.dropdown-menu.show')) return;
+        e.preventDefault();
+        input.focus({ preventScroll: true });
+        input.select();
+      });
+    })();
+
+    // Escritorio: cabecera sticky bajo la navbar y alto del tablero para que todo quepa en una pantalla.
+    (function () {
+      const cabecera = document.getElementById('cabeceraTablero');
+      const tablero = document.querySelector('.kanban-board');
+      const navWrap = document.querySelector('.pf-nav-wrap');
+      if (!cabecera || !tablero || !navWrap) return;
+      const raiz = document.documentElement.style;
+      function medir() {
+        if (!enColumnas()) {
+          raiz.removeProperty('--top-cabecera');
+          raiz.removeProperty('--alto-tablero');
+          return;
+        }
+        raiz.setProperty('--top-cabecera', navWrap.getBoundingClientRect().height + 'px');
+        // Bottom natural de la cabecera (en la posición inicial, sin importar el scroll actual)
+        const cont = cabecera.parentElement;
+        const inicio = cont.getBoundingClientRect().top + window.scrollY + parseFloat(getComputedStyle(cont).paddingTop);
+        const bottom = inicio + cabecera.offsetHeight;
+        const alto = Math.max(420, window.innerHeight - bottom - 32);
+        raiz.setProperty('--alto-tablero', alto + 'px');
+      }
+      window.addEventListener('load', medir);
+      window.addEventListener('resize', medir);
+      window.addEventListener('pfmodo', medir);
+      if ('ResizeObserver' in window) new ResizeObserver(medir).observe(cabecera);
+      medir();
+    })();
+
+    // Pestañas de columnas en móvil: solo la columna activa queda visible
+    const CLAVE_TAB = 'dashboard_tab_activa';
+    const tabs = document.querySelectorAll('.kanban-tab');
+    function activarTab(nombre) {
+      if (enPestanas()) {
+        const visible = [...tabs].filter(t => !t.hidden);
+        if (visible.length && !visible.some(t => t.dataset.tab === nombre)) nombre = visible[0].dataset.tab;
+      }
+      tabs.forEach(t => {
+        const activa = t.dataset.tab === nombre;
+        t.classList.toggle('active', activa);
+        t.setAttribute('aria-selected', activa);
+      });
+      document.querySelectorAll('.columna-kanban').forEach(col => {
+        const activa = col.dataset.col === nombre;
+        col.classList.toggle('tab-activa', activa);
+        if (activa && enPestanas()) {
+          col.classList.remove('columna-cambio');
+          void col.offsetWidth;
+          col.classList.add('columna-cambio');
+        }
+      });
+      sessionStorage.setItem(CLAVE_TAB, nombre);
+    }
+    tabs.forEach(t => t.addEventListener('click', () => {
+      activarTab(t.dataset.tab);
+      window.scrollTo(0, 0);
+    }));
+    const tabGuardada = sessionStorage.getItem(CLAVE_TAB);
+    activarTab([...tabs].some(t => t.dataset.tab === tabGuardada) ? tabGuardada : (tabs[0]?.dataset.tab || 'en-proceso'));
+
+    // Las pestañas se pegan justo debajo de la barra superior que esté activa (la de móvil trae el buscador desplegable)
+    const navWrap = document.querySelector('.pf-nav-wrap');
+    const navMovil = document.querySelector('.pf-nav-movil-wrap');
+    function ajustarTopTabs() {
+      const barra = enPestanas() ? navMovil : navWrap;
+      if (!barra || barra.querySelector('.navbar-collapse.show, .navbar-collapse.collapsing')) return;
+      document.documentElement.style.setProperty('--kanban-tabs-top', `${barra.offsetHeight}px`);
+    }
+    ajustarTopTabs();
+    window.addEventListener('resize', ajustarTopTabs);
+    if ('ResizeObserver' in window && navMovil) new ResizeObserver(ajustarTopTabs).observe(navMovil);
+
+    // Al cambiar columnas ↔ pestañas: Producción recalcula sus pestañas visibles y se re-aplica la activa.
+    window.addEventListener('pfmodo', () => {
+      columnasProduccion();
+      activarTab(sessionStorage.getItem(CLAVE_TAB) || tabs[0]?.dataset.tab || 'en-proceso');
+      ajustarTopTabs();
+    });
+
+    // Vista ampliada: la tarjeta pierde cliente/producto repetidos del encabezado
+    ['show', 'hide'].forEach(ev => document.addEventListener(ev + '.bs.collapse', e => {
+      if (!e.target.classList.contains('card-extra')) return;
+      e.target.closest('.pedido-card')?.classList.toggle('expandida', ev === 'show');
+    }));
+
+    // Delegado en document: también cubre las tarjetas que inserta tablero_sync.js
+    document.addEventListener('click', e => {
+      const card = e.target.closest('.card-pedido');
+      if (!card || e.target.closest('a, button, form, input, select, textarea, .card-extra')) return;
+      const extra = card.querySelector('.card-extra');
+      if (extra) bootstrap.Collapse.getOrCreateInstance(extra).toggle();
+    });
+
+    const quickActions = document.getElementById('dashboardQuickActions');
+    const quickTrigger = document.getElementById('dashboardQuickTrigger');
+    const quickMenu = document.getElementById('dashboardQuickMenu');
+    function cerrarAccionesRapidas() {
+      if (!quickActions || !quickTrigger || !quickMenu) return;
+      quickActions.classList.remove('is-open');
+      quickTrigger.setAttribute('aria-expanded', 'false');
+      quickMenu.setAttribute('aria-hidden', 'true');
+    }
+    quickTrigger?.addEventListener('click', () => {
+      const abierta = quickActions.classList.toggle('is-open');
+      quickTrigger.setAttribute('aria-expanded', String(abierta));
+      quickMenu.setAttribute('aria-hidden', String(!abierta));
+    });
+    quickMenu?.querySelectorAll('[data-bs-toggle="modal"]').forEach(accion => {
+      accion.addEventListener('click', cerrarAccionesRapidas);
+    });
+    document.addEventListener('click', evento => {
+      if (quickActions && !quickActions.contains(evento.target)) cerrarAccionesRapidas();
+    });
+    document.addEventListener('keydown', evento => {
+      if (evento.key === 'Escape') cerrarAccionesRapidas();
+    });
+  });
+</script>
+{% endblock %}

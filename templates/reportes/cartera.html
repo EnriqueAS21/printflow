@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+{% block title %}Área Creativa - Cartera{% endblock %}
+{% block styles %}{% include 'reportes/_estilos.html' %}{% endblock %}
+
+{% block content %}
+{% from 'reportes/_macros.html' import dinero %}
+{% set r = datos.resumen %}
+<div class="rep-wrap">
+  {% with tab='cartera' %}{% include 'reportes/_tabs.html' %}{% endwith %}
+
+  <form method="get" class="rep-card rep-filtros no-print">
+    <div class="row g-2 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label small fw-bold text-muted mb-1">Estado de pago</label>
+        <select name="estado" class="form-select" onchange="this.form.submit()">
+          <option value="">Todos los pendientes</option>
+          <option value="Sin pagar" {% if estado == 'Sin pagar' %}selected{% endif %}>Sin pagar</option>
+          <option value="Anticipo" {% if estado == 'Anticipo' %}selected{% endif %}>Con anticipo</option>
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label small fw-bold text-muted mb-1">Buscar cliente o folio</label>
+        <input type="text" id="buscar" class="form-control" placeholder="Ej. AC0012 o nombre" autocomplete="off">
+      </div>
+      <div class="col-md-5 d-flex flex-wrap gap-2 justify-content-md-end">
+        <a class="btn btn-outline-success rounded-pill" href="{{ url_for('reportes.cartera', estado=estado, formato='csv') }}">CSV</a>
+        <button type="button" class="btn btn-outline-dark rounded-pill" onclick="window.print()">PDF / Imprimir</button>
+      </div>
+    </div>
+  </form>
+
+  <div class="rep-membrete">
+    <h4 class="fw-bold mb-0">Estado de cartera · Saldos pendientes</h4>
+    <div class="small text-muted">{{ config.get('NOMBRE_CLIENTE', 'Área Creativa') }}{% if estado %} · {{ estado }}{% endif %} · Generado {{ generado.strftime('%d/%m/%Y %I:%M %p') }}</div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-6 col-lg-3"><div class="kpi"><small>Total por cobrar</small><strong class="text-danger">{{ dinero(r.saldo) }}</strong><div class="small text-muted">{{ r.pedidos }} pedidos</div></div></div>
+    <div class="col-6 col-lg-3"><div class="kpi"><small>Sin pagar</small><strong class="text-danger">{{ dinero(r.sin_pagar) }}</strong><div class="small text-muted">{{ r.n_sin_pagar }} pedidos</div></div></div>
+    <div class="col-6 col-lg-3"><div class="kpi"><small>Con anticipo</small><strong style="color:#e8590c;">{{ dinero(r.anticipo) }}</strong><div class="small text-muted">{{ r.n_anticipo }} pedidos</div></div></div>
+    <div class="col-6 col-lg-3"><div class="kpi"><small>Con fecha de entrega vencida</small><strong>{{ dinero(r.vencidos) }}</strong><div class="small text-muted">{{ r.n_vencidos }} pedidos</div></div></div>
+  </div>
+
+  <div class="rep-card permitir-corte">
+    <h5>Pedidos con saldo pendiente</h5>
+    <div class="table-responsive">
+      <table class="table table-sm rep-table mb-0" id="tabla-cartera">
+        <thead><tr><th>Folio</th><th>Cliente</th><th>Creación</th><th>Entrega</th><th class="num">Total</th><th class="num">Anticipo</th><th class="num">Saldo</th><th>Pago</th></tr></thead>
+        <tbody>
+          {% for f in datos.filas %}
+          <tr data-texto="{{ (f.folio ~ ' ' ~ f.cliente ~ ' ' ~ f.telefono)|lower }}">
+            <td class="fw-semibold">{{ f.folio }}</td>
+            <td>{{ f.cliente }}<div class="small text-muted">{{ f.telefono }}</div></td>
+            <td class="text-nowrap">{{ f.creacion.strftime('%d/%m/%Y') if f.creacion else '—' }}</td>
+            <td class="text-nowrap">{{ f.entrega.strftime('%d/%m/%Y %I:%M %p') }}
+              {% if f.vencido and f.dias_vencido > 0 %}<div><span class="badge text-bg-danger">Vencido hace {{ f.dias_vencido }} d</span></div>
+              {% elif f.vencido %}<div><span class="badge text-bg-warning">Vence hoy</span></div>{% endif %}</td>
+            <td class="num">{{ dinero(f.total) }}</td>
+            <td class="num">{{ dinero(f.pagado) }}</td>
+            <td class="num fw-bold">{{ dinero(f.saldo) }}</td>
+            <td>{% if f.estado_pago == 'Sin pagar' %}<span class="badge text-bg-danger">Sin pagar</span>
+                {% else %}<span class="badge text-bg-warning">Anticipo</span>{% endif %}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="8" class="text-center text-muted py-4">No hay saldos pendientes. 🎉</td></tr>
+          {% endfor %}
+          <tr id="fila-sin-resultados" hidden><td colspan="8" class="text-center text-muted py-4">Ningún pedido coincide con la búsqueda.</td></tr>
+        </tbody>
+        <tfoot><tr><td colspan="4">Total</td><td class="num">{{ dinero(r.total) }}</td><td class="num">{{ dinero(r.pagado) }}</td><td class="num">{{ dinero(r.saldo) }}</td><td></td></tr></tfoot>
+      </table>
+    </div>
+  </div>
+
+  {% if datos.por_cliente %}
+  <div class="rep-card">
+    <h5>Saldo por cliente</h5>
+    <div class="table-responsive">
+      <table class="table table-sm rep-table mb-0">
+        <thead><tr><th>Cliente</th><th>Teléfono</th><th class="num">Pedidos</th><th class="num">Saldo pendiente</th></tr></thead>
+        <tbody>
+          {% for c in datos.por_cliente %}
+          <tr><td class="fw-semibold">{{ c.cliente }}</td><td>{{ c.telefono }}</td><td class="num">{{ c.pedidos }}</td><td class="num fw-bold">{{ dinero(c.saldo) }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const norm = t => (t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+  document.getElementById('buscar').addEventListener('input', e => {
+    const q = norm(e.target.value);
+    const filas = [...document.querySelectorAll('#tabla-cartera tbody tr[data-texto]')];
+    let visibles = 0;
+    filas.forEach(tr => { const ok = !q || norm(tr.dataset.texto).includes(q); tr.hidden = !ok; if (ok) visibles++; });
+    document.getElementById('fila-sin-resultados').hidden = !(filas.length && visibles === 0);
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+
+{% block title %}Área Creativa - Registrar Pedido{% endblock %}
+
+{% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/formulario_pedido.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="container my-4" style="max-width: 950px;">
+  {% include 'pedidos/_formulario_pedido.html' %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/formulario_pedido.js') }}"></script>
+{% endblock %}

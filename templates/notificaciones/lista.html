@@ -1,0 +1,139 @@
+{% extends 'base.html' %}
+{% block title %}Área Creativa - Notificaciones{% endblock %}
+
+{% block styles %}
+<style>
+  body { background-color: #f7f9fc; }
+
+  .notif-panel {
+    background: #fff;
+    border-radius: 24px;
+    padding: 1.5rem 1.25rem;
+    border: 1px solid #eef0f3;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.03);
+  }
+  .notif-titulo { font-weight: 700; font-size: 1.2rem; color: #1a1a1a; margin: 0; }
+
+  /* Pestañas en píldora */
+  .notif-tabs { gap: .35rem; }
+  .notif-tabs .nav-link {
+    border-radius: 30px; padding: .3rem 1.1rem; font-size: .9rem; font-weight: 500;
+    color: #495057; background: #f1f3f6;
+  }
+  .notif-tabs .nav-link.active { background: var(--pf-nav); color: #fff; }
+
+  .btn-leer-todas {
+    border: 1px solid #ced4da; background: #fff; color: #495057;
+    border-radius: 30px; padding: .3rem 1rem; font-size: .88rem;
+  }
+  .btn-leer-todas:hover { border-color: var(--pf-nav); color: var(--pf-nav); }
+
+  /* Tarjetas de aviso (mismo estilo que .pedido-card del tablero) */
+  .notif-card {
+    background: #fff;
+    border: 1px solid #eaedf1;
+    border-radius: 16px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+    display: flex; align-items: flex-start; gap: .9rem;
+    transition: transform 0.15s ease;
+  }
+  .notif-card:hover { transform: translateY(-2px); }
+  .notif-card.no-leida { background: #eef4ff; border-color: #d6e4ff; }
+
+  .notif-icono {
+    width: 34px; height: 34px; flex-shrink: 0; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 1rem;
+  }
+
+  .notif-punto { width: 8px; height: 8px; border-radius: 50%; background: var(--pf-nav); display: inline-block; }
+  .notif-fecha { font-size: .8rem; color: #6c757d; white-space: nowrap; }
+
+  .btn-abrir {
+    background-color: #0084ff; color: #fff; border: 0;
+    border-radius: 30px; padding: .25rem 1.2rem; font-size: .82rem; font-weight: 500;
+  }
+  .btn-abrir:hover { opacity: .88; color: #fff; }
+
+  .notif-panel .pagination .page-link { border-radius: 30px; margin: 0 .15rem; border: 0; color: #495057; }
+  .notif-panel .pagination .active .page-link { background: var(--pf-nav); color: #fff; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 900px;">
+  <div class="notif-panel">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+      <h4 class="notif-titulo"><i class="bi bi-bell-fill me-2" style="color: var(--pf-nav);"></i>Notificaciones</h4>
+      <form method="POST" action="{{ url_for('notificaciones.leer_todas') }}" class="m-0">
+        <button type="submit" class="btn-leer-todas"><i class="bi bi-check2-all me-1"></i>Marcar todas como leídas</button>
+      </form>
+    </div>
+
+    <ul class="nav notif-tabs mb-4">
+      <li class="nav-item">
+        <a class="nav-link {% if not solo_no_leidas %}active{% endif %}" href="{{ url_for('notificaciones.lista') }}">Todas</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link {% if solo_no_leidas %}active{% endif %}" href="{{ url_for('notificaciones.lista', solo='no_leidas') }}">No leídas</a>
+      </li>
+    </ul>
+
+    {% if paginacion.items %}
+      {% for n in paginacion.items %}
+      {% set icono, color = icono_notificacion(n.tipo) %}
+      <div class="notif-card {% if not n.leida %}no-leida{% endif %}">
+        <span class="notif-icono bg-{{ color }}">
+          <i class="bi {{ icono }}"></i>
+        </span>
+        <div class="flex-grow-1 min-w-0">
+          <div class="d-flex justify-content-between align-items-start gap-2">
+            <span class="fw-bold">
+              {% if not n.leida %}<span class="notif-punto me-1" title="No leída"></span>{% endif %}{{ n.titulo }}
+            </span>
+            <span class="notif-fecha">{{ n.fecha.strftime('%d/%m/%Y %I:%M') }} {{ 'am' if n.fecha.hour < 12 else 'pm' }}</span>
+          </div>
+          {% if n.mensaje %}<div class="small text-muted mt-1">{{ n.mensaje }}</div>{% endif %}
+          <div class="d-flex justify-content-between align-items-center mt-2">
+            <span class="small text-muted">{% if n.folio %}Pedido {{ n.folio }}{% endif %}</span>
+            <form method="POST" action="{{ url_for('notificaciones.abrir', id=n.id_notificacion) }}" class="m-0">
+              <button type="submit" class="btn-abrir">Abrir</button>
+            </form>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="text-center text-muted py-5">
+        <i class="bi bi-bell-slash d-block mb-2" style="font-size: 2rem;"></i>
+        No tienes notificaciones
+      </div>
+    {% endif %}
+
+    {% if paginacion.pages > 1 %}
+    <nav class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-3" aria-label="Paginación">
+      <span class="small text-muted">Página {{ paginacion.page }} de {{ paginacion.pages }} · {{ paginacion.total }} notificaciones</span>
+      <ul class="pagination pagination-sm mb-0">
+        <li class="page-item {% if not paginacion.has_prev %}disabled{% endif %}">
+          <a class="page-link" href="{{ url_for('notificaciones.lista', pagina=paginacion.prev_num, **filtros) if paginacion.has_prev else '#' }}" aria-label="Anterior">&laquo;</a>
+        </li>
+        {% for p in paginacion.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+          {% if p %}
+          <li class="page-item {% if p == paginacion.page %}active{% endif %}">
+            <a class="page-link" href="{{ url_for('notificaciones.lista', pagina=p, **filtros) }}">{{ p }}</a>
+          </li>
+          {% else %}
+          <li class="page-item disabled"><span class="page-link">…</span></li>
+          {% endif %}
+        {% endfor %}
+        <li class="page-item {% if not paginacion.has_next %}disabled{% endif %}">
+          <a class="page-link" href="{{ url_for('notificaciones.lista', pagina=paginacion.next_num, **filtros) if paginacion.has_next else '#' }}" aria-label="Siguiente">&raquo;</a>
+        </li>
+      </ul>
+    </nav>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

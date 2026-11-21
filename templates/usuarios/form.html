@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block title %}Área Creativa - {{ 'Editar' if usuario else 'Nuevo' }} usuario{% endblock %}
+
+{% block styles %}
+<style>
+  .u-input { background-color: #f2f2f2 !important; border: none !important; border-radius: 50px !important; padding: .65rem 1.25rem !important; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 560px;">
+  <form method="POST" class="bg-white rounded-4 shadow-sm p-4">
+    <h4 class="fw-bold mb-3">{{ 'Editar usuario' if usuario else 'Nuevo usuario' }}</h4>
+
+    <div class="mb-3"><input type="text" name="nombre" class="form-control u-input" placeholder="Nombre completo" value="{{ valores.get('nombre', '') }}" required></div>
+    <div class="mb-3"><input type="email" name="correo" class="form-control u-input" placeholder="Correo" value="{{ valores.get('correo', '') }}" required></div>
+    <div class="mb-3"><input type="text" name="telefono" class="form-control u-input" placeholder="Teléfono (opcional)" value="{{ valores.get('telefono', '') }}"></div>
+    <div class="mb-3">
+      <select name="rol" class="form-select u-input" required>
+        {% for r in roles %}<option value="{{ r }}" {% if valores.get('rol') == r %}selected{% endif %}>{{ r }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="mb-4">
+      <input type="password" name="password" class="form-control u-input" autocomplete="new-password"
+             placeholder="{{ 'Nueva contraseña (vacío = no cambiar)' if usuario else 'Contraseña (mínimo 8 caracteres)' }}"
+             {% if not usuario %}required{% endif %}>
+    </div>
+
+    <div class="d-flex justify-content-between">
+      <a href="{{ url_for('usuarios.lista') }}" class="btn btn-outline-secondary rounded-pill px-4">Cancelar</a>
+      <button type="submit" class="btn btn-primary rounded-pill px-4">Guardar</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,12 @@
+<script>
+  function fijarRango(tipo) {
+    const f = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    const hoy = new Date();
+    let ini = new Date(hoy);
+    if (tipo === 'semana') ini.setDate(hoy.getDate() - ((hoy.getDay() + 6) % 7));   // lunes
+    if (tipo === 'mes') ini = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+    document.getElementById('desde').value = f(ini);
+    document.getElementById('hasta').value = f(hoy);
+    document.getElementById('form-rep').submit();
+  }
+</script>

@@ -1,0 +1,239 @@
+{% macro dinero(v) -%}{{ '-' if v < 0 else '' }}${{ '{:,.2f}'.format(v|abs) }}{%- endmacro %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reporte de caja{% if corte %} · Corte #{{ corte.id_corte }}{% endif %}</title>
+  <style>
+    :root { --azul:#0088ff; --rojo:#d93025; --verde:#188038; --gris:#6c757d; --borde:#dee2e6; --fondo:#f6f8fb; }
+    @page { size: letter portrait; margin: 12mm; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #eef1f5; color: #212529; font-size: 12px; line-height: 1.4;
+           font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+
+    /* Barra de controles (no se imprime) */
+    .barra { max-width: 200mm; margin: 14px auto 0; display: flex; flex-wrap: wrap; gap: 10px;
+             align-items: center; background: #fff; border-radius: 10px; padding: 10px 14px;
+             box-shadow: 0 2px 10px rgba(0,0,0,.08); }
+    .barra label { display: flex; flex-direction: column; font-size: 10px; color: var(--gris); text-transform: uppercase; }
+    .barra select { font-size: 13px; padding: 5px 8px; border: 1px solid var(--borde); border-radius: 8px; }
+    .barra .espacio { flex: 1; }
+    .barra a { color: var(--gris); text-decoration: none; font-size: 13px; }
+    .barra button { background: var(--azul); color: #fff; border: 0; border-radius: 999px; padding: 8px 20px;
+                    font-weight: 600; cursor: pointer; }
+
+    .hoja { max-width: 200mm; margin: 14px auto; background: #fff; padding: 12mm; border-radius: 6px;
+            box-shadow: 0 2px 10px rgba(0,0,0,.08); }
+    .encabezado { display: flex; justify-content: space-between; align-items: flex-end;
+                  border-bottom: 3px solid var(--azul); padding-bottom: 8px; margin-bottom: 12px; }
+    h1 { margin: 0; font-size: 20px; }
+    .sub { color: var(--gris); }
+    .estado { display: inline-block; border: 1px solid var(--azul); color: var(--azul); border-radius: 999px;
+              padding: 1px 10px; font-size: 10px; font-weight: 700; text-transform: uppercase; }
+    .estado.cerrado { border-color: var(--verde); color: var(--verde); }
+
+    .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 12px 0; }
+    .kpi { border: 1px solid var(--borde); border-radius: 8px; padding: 8px 10px; background: var(--fondo); }
+    .kpi small { display: block; color: var(--gris); font-size: 10px; text-transform: uppercase; letter-spacing: .04em; }
+    .kpi strong { font-size: 16px; }
+    .kpi.ventas strong { color: var(--azul); }
+    .kpi.egresos strong { color: var(--rojo); }
+
+    h2 { font-size: 13px; margin: 16px 0 6px; border-left: 4px solid var(--azul); padding-left: 6px; }
+    .dos { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+    table { width: 100%; border-collapse: collapse; }
+    th { background: #e9ecef; text-align: left; padding: 5px 6px; font-size: 11px; }
+    td { padding: 5px 6px; border-bottom: 1px solid #edf0f3; vertical-align: top; }
+    .der { text-align: right; }
+    .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+    tr.total td, tfoot td { font-weight: 700; border-top: 2px solid #adb5bd; border-bottom: 0; }
+    tr.egreso td { color: var(--rojo); }
+    thead { display: table-header-group; }
+    tr { page-break-inside: avoid; }
+    .chico { font-size: 10px; color: var(--gris); }
+    #filtro-activo { color: var(--rojo); font-weight: 600; margin-bottom: 4px; }
+
+    .firmas { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top: 30px; page-break-inside: avoid; }
+    .firma { border-top: 1px solid #000; text-align: center; padding-top: 4px; font-size: 11px; }
+
+    @media print {
+      body { background: #fff; }
+      .no-print { display: none !important; }
+      .hoja { margin: 0; padding: 0; max-width: none; box-shadow: none; border-radius: 0; }
+      * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="barra no-print">
+    <form method="get">
+      <label>Periodo
+        <select name="corte" onchange="this.form.submit()">
+          <option value="">Periodo abierto (actual)</option>
+          {% for c in cortes %}
+          <option value="{{ c.id_corte }}" {% if corte and corte.id_corte == c.id_corte %}selected{% endif %}>
+            Corte #{{ c.id_corte }} · {{ c.fecha_corte.strftime('%d/%m/%Y %H:%M') }}
+          </option>
+          {% endfor %}
+        </select>
+      </label>
+    </form>
+    <label>Mostrar
+      <select id="f-tipo">
+        <option value="todos">Ventas y egresos</option>
+        <option value="venta">Solo ventas</option>
+        <option value="egreso">Solo egresos</option>
+      </select>
+    </label>
+    <label>Método
+      <select id="f-metodo">
+        <option value="todos">Todos</option>
+        {% for m in metodos %}<option value="{{ m }}">{{ m }}</option>{% endfor %}
+      </select>
+    </label>
+    <span class="espacio"></span>
+    <a href="{{ url_for('caja.index') }}">← Volver a Caja</a>
+    <button type="button" onclick="window.print()">Imprimir</button>
+  </div>
+
+  <div class="hoja">
+    <div class="encabezado">
+      <div>
+        <h1>Reporte de caja</h1>
+        <div class="sub">{{ config.get('NOMBRE_CLIENTE', 'Área Creativa') }}</div>
+      </div>
+      <div class="der">
+        {% if corte %}<span class="estado cerrado">Corte #{{ corte.id_corte }} cerrado</span>
+        {% else %}<span class="estado">Periodo abierto</span>{% endif %}
+        <div class="sub" style="margin-top:4px;">
+          Del {{ inicio.strftime('%d/%m/%Y %H:%M') if inicio else 'inicio de operaciones' }}
+          al {{ fin.strftime('%d/%m/%Y %H:%M') if fin else generado.strftime('%d/%m/%Y %H:%M') ~ ' (a la fecha)' }}
+        </div>
+      </div>
+    </div>
+
+    <div class="kpis">
+      <div class="kpi ventas"><small>Total de ventas</small><strong>{{ dinero(total_ventas) }}</strong></div>
+      <div class="kpi egresos"><small>Total de egresos</small><strong>{{ dinero(total_egresos) }}</strong></div>
+      <div class="kpi"><small>Ganancia neta</small>
+        <strong style="color: {{ 'var(--verde)' if ganancia >= 0 else 'var(--rojo)' }}">{{ dinero(ganancia) }}</strong></div>
+      <div class="kpi"><small>Efectivo disponible</small><strong>{{ dinero(efectivo_disponible) }}</strong></div>
+    </div>
+
+    <h2>Desglose por método de pago</h2>
+    <table>
+      <thead><tr><th>Método</th><th class="der">Ventas</th><th class="der">Egresos</th><th class="der">Neto</th></tr></thead>
+      <tbody>
+        {% for d in desglose %}
+        <tr><td>{{ d.metodo }}</td><td class="der num">{{ dinero(d.ventas) }}</td>
+            <td class="der num">{{ dinero(d.egresos) }}</td><td class="der num">{{ dinero(d.neto) }}</td></tr>
+        {% endfor %}
+        <tr class="total"><td>Total</td><td class="der num">{{ dinero(total_ventas) }}</td>
+            <td class="der num">{{ dinero(total_egresos) }}</td><td class="der num">{{ dinero(ganancia) }}</td></tr>
+        <tr><td colspan="3">IVA cobrado <span class="chico">(informativo; fuera de ventas)</span></td>
+          <td class="der num">{{ dinero(iva_periodo) }}</td></tr>
+        <tr><td colspan="3">Comisión tarjeta <span class="chico">(informativo; fuera de ventas)</span></td>
+          <td class="der num">{{ dinero(comision_periodo) }}</td></tr>
+      </tbody>
+    </table>
+
+    <div class="dos">
+      <div>
+        <h2>Origen de las ventas</h2>
+        <table>
+          <tbody>
+            <tr><td>Pedidos (anticipos y abonos)</td><td class="der num">{{ dinero(ventas_pedidos) }}</td></tr>
+            <tr><td>Mostrador (tickets)</td><td class="der num">{{ dinero(ventas_mostrador) }}</td></tr>
+            <tr class="total"><td>Total de ventas</td><td class="der num">{{ dinero(total_ventas) }}</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div>
+        <h2>Arqueo de efectivo</h2>
+        <table>
+          <tbody>
+            <tr><td>Fondo inicial</td><td class="der num">{{ dinero(fondo) }}</td></tr>
+            <tr><td>(+) Ventas en efectivo</td><td class="der num">{{ dinero(ing_efectivo) }}</td></tr>
+            <tr><td>(−) Egresos en efectivo</td><td class="der num">{{ dinero(egr_efectivo) }}</td></tr>
+            <tr class="total"><td>Efectivo disponible</td><td class="der num">{{ dinero(efectivo_disponible) }}</td></tr>
+            {% if corte %}
+            <tr><td>(−) Retiro de efectivo</td><td class="der num">{{ dinero(corte.retiro_efectivo|float) }}</td></tr>
+            <tr class="total"><td>Quedó en caja</td><td class="der num">{{ dinero(corte.saldo_final|float) }}</td></tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <h2>Detalle de movimientos</h2>
+    <div id="filtro-activo" class="chico" hidden></div>
+    <table id="tabla-mov">
+      <thead>
+        <tr>
+          <th style="width:15%">Fecha y hora</th><th style="width:14%">Tipo</th><th style="width:8%">Folio</th>
+          <th style="width:6%">Cant.</th><th style="width:31%">Descripción</th><th style="width:12%">Método</th>
+          <th class="der" style="width:14%">Importe</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for f in movimientos %}
+        {% set egreso = f.tipo == 'EGRESO' %}
+        <tr class="{{ 'egreso' if egreso else '' }}" data-tipo="{{ 'egreso' if egreso else 'venta' }}"
+            data-metodo="{{ f.metodo_pago }}" data-importe="{{ f.subtotal }}">
+          <td class="num">{{ f.fecha.strftime('%d/%m/%Y %H:%M') if f.fecha else '—' }}</td>
+          <td>{{ 'Egreso' if egreso else 'Venta · ' ~ f.origen }}</td>
+          <td>{{ f.folio if f.folio != 'N/A' else '—' }}</td>
+          <td>{{ f.cantidad }}</td>
+          <td>{% for l in f.lineas %}<div>{{ l }}</div>{% endfor %}</td>
+          <td>{{ f.metodo_pago }}</td>
+          <td class="der num">{{ dinero(f.subtotal) }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" style="text-align:center;color:var(--gris);padding:16px;">Sin movimientos en este periodo.</td></tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr><td colspan="6">Total mostrado (<span id="conteo-visible">{{ movimientos|length }}</span> movimientos)</td>
+            <td class="der num" id="total-visible">{{ dinero(ganancia) }}</td></tr>
+      </tfoot>
+    </table>
+
+    <div class="firmas">
+      <div class="firma">Elaboró{% if usuario_actual %}: {{ usuario_actual.nombre }}{% endif %}</div>
+      <div class="firma">Revisó</div>
+    </div>
+    <div class="chico" style="margin-top:10px;">Generado el {{ generado.strftime('%d/%m/%Y %I:%M %p') }}</div>
+  </div>
+
+  <script>
+    const fTipo = document.getElementById('f-tipo');
+    const fMetodo = document.getElementById('f-metodo');
+    const moneda = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' });
+
+    function aplicar() {
+      let total = 0, n = 0;
+      document.querySelectorAll('#tabla-mov tbody tr[data-tipo]').forEach(tr => {
+        const ok = (fTipo.value === 'todos' || tr.dataset.tipo === fTipo.value) &&
+                   (fMetodo.value === 'todos' || tr.dataset.metodo === fMetodo.value);
+        tr.hidden = !ok;
+        if (ok) { total += parseFloat(tr.dataset.importe) || 0; n++; }
+      });
+      document.getElementById('total-visible').textContent = moneda.format(total);
+      document.getElementById('conteo-visible').textContent = n;
+
+      // Leyenda que sí se imprime, para no confundir el total filtrado con el total general
+      const partes = [];
+      if (fTipo.value !== 'todos') partes.push(fTipo.value === 'venta' ? 'solo ventas' : 'solo egresos');
+      if (fMetodo.value !== 'todos') partes.push('método: ' + fMetodo.value);
+      const aviso = document.getElementById('filtro-activo');
+      aviso.hidden = partes.length === 0;
+      aviso.textContent = partes.length ? 'Filtro aplicado: ' + partes.join(' · ') : '';
+    }
+    fTipo.addEventListener('change', aplicar);
+    fMetodo.addEventListener('change', aplicar);
+  </script>
+</body>
+</html>

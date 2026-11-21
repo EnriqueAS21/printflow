@@ -1,0 +1,745 @@
+{
+ "datos": {
+  "pedidos": 2000,
+  "en_proceso": 160,
+  "terminado": 80,
+  "entregado": 1760,
+  "bitacora": 19845,
+  "notificaciones": 3680
+ },
+ "resultados": [
+  {
+   "nombre": "estático /static/js/tablero_sync.js",
+   "consultas": 0,
+   "db_ms": 0.0,
+   "ms": 0.2,
+   "p95_ms": 0.2,
+   "bytes": 25482,
+   "gzip_bytes": 7157,
+   "estado": 200,
+   "max_repetida": 0
+  },
+  {
+   "nombre": "solicitud vacía (solo before_request)",
+   "consultas": 1,
+   "db_ms": 0.2,
+   "ms": 0.5,
+   "p95_ms": 0.6,
+   "bytes": 2,
+   "gzip_bytes": 22,
+   "estado": 200,
+   "max_repetida": 1
+  },
+  {
+   "nombre": "plantilla base.html vacía (context processors)",
+   "consultas": 2,
+   "db_ms": 0.3,
+   "ms": 1.0,
+   "p95_ms": 1.2,
+   "bytes": 44339,
+   "gzip_bytes": 10102,
+   "estado": 200,
+   "max_repetida": 1
+  },
+  {
+   "nombre": "GET / (tablero completo)",
+   "consultas": 31,
+   "db_ms": 25.3,
+   "ms": 83.3,
+   "p95_ms": 91.3,
+   "bytes": 1709455,
+   "gzip_bytes": 98380,
+   "estado": 200,
+   "max_repetida": 6
+  },
+  {
+   "nombre": "GET / como Producción",
+   "consultas": 31,
+   "db_ms": 24.3,
+   "ms": 49.6,
+   "p95_ms": 60.9,
+   "bytes": 591284,
+   "gzip_bytes": 41116,
+   "estado": 200,
+   "max_repetida": 6
+  },
+  {
+   "nombre": "GET /cambios SIN cambios",
+   "consultas": 2,
+   "db_ms": 0.6,
+   "ms": 1.1,
+   "p95_ms": 1.4,
+   "bytes": 44,
+   "gzip_bytes": 58,
+   "estado": 200,
+   "max_repetida": 1
+  },
+  {
+   "nombre": "GET /cambios SIN cambios (Producción)",
+   "consultas": 2,
+   "db_ms": 0.7,
+   "ms": 1.2,
+   "p95_ms": 1.3,
+   "bytes": 44,
+   "gzip_bytes": 58,
+   "estado": 200,
+   "max_repetida": 1
+  },
+  {
+   "nombre": "GET /dashboard/entregados (1.ª página)",
+   "consultas": 13,
+   "db_ms": 7.1,
+   "ms": 15.4,
+   "p95_ms": 16.2,
+   "bytes": 173947,
+   "gzip_bytes": 8451,
+   "estado": 200,
+   "max_repetida": 2
+  },
+  {
+   "nombre": "GET /dashboard/entregados (2.ª página, cursor)",
+   "consultas": 13,
+   "db_ms": 7.6,
+   "ms": 16.3,
+   "p95_ms": 26.8,
+   "bytes": 168237,
+   "gzip_bytes": 8066,
+   "estado": 200,
+   "max_repetida": 2
+  },
+  {
+   "nombre": "GET /buscar?q=Ana (cliente, auto)",
+   "consultas": 12,
+   "db_ms": 8.9,
+   "ms": 15.9,
+   "p95_ms": 18.0,
+   "bytes": 129846,
+   "gzip_bytes": 7302,
+   "estado": 200,
+   "max_repetida": 2
+  },
+  {
+   "nombre": "GET /buscar?q=PRB00123 (folio)",
+   "consultas": 11,
+   "db_ms": 5.2,
+   "ms": 7.7,
+   "p95_ms": 10.8,
+   "bytes": 6203,
+   "gzip_bytes": 1889,
+   "estado": 200,
+   "max_repetida": 1
+  },
+  {
+   "nombre": "GET /buscar?q=lona (productos, completo)",
+   "consultas": 12,
+   "db_ms": 13.0,
+   "ms": 22.4,
+   "p95_ms": 32.3,
+   "bytes": 134077,
+   "gzip_bytes": 7740,
+   "estado": 200,
+   "max_repetida": 2
+  },
+  {
+   "nombre": "GET /buscar?q=zzzz (sin resultados)",
+   "consultas": 5,
+   "db_ms": 3.1,
+   "ms": 4.2,
+   "p95_ms": 5.6,
+   "bytes": 32,
+   "gzip_bytes": 50,
+   "estado": 200,
+   "max_repetida": 1
+  },
+  {
+   "nombre": "GET /notificaciones/resumen (cada 30 s)",
+   "consultas": 4,
+   "db_ms": 0.7,
+   "ms": 1.5,
+   "p95_ms": 1.7,
+   "bytes": 1384,
+   "gzip_bytes": 361,
+   "estado": 200,
+   "max_repetida": 1
+  },
+  {
+   "nombre": "GET /notificaciones/resumen (Producción)",
+   "consultas": 4,
+   "db_ms": 0.7,
+   "ms": 1.3,
+   "p95_ms": 1.9,
+   "bytes": 55,
+   "gzip_bytes": 73,
+   "estado": 200,
+   "max_repetida": 1
+  },
+  {
+   "nombre": "GET /pedidos/etiquetas/cola (cada 5 s)",
+   "consultas": 1,
+   "db_ms": 0.2,
+   "ms": 0.4,
+   "p95_ms": 0.5,
+   "bytes": 178,
+   "gzip_bytes": 138,
+   "estado": 200,
+   "max_repetida": 1
+  },
+  {
+   "nombre": "GET /cambios con 1 tarjeta nueva (cliente atrasado)",
+   "consultas": 16,
+   "db_ms": 3.8,
+   "ms": 7.3,
+   "p95_ms": 13.7,
+   "bytes": 6420,
+   "gzip_bytes": 1893,
+   "estado": 200,
+   "max_repetida": 1
+  },
+  {
+   "nombre": "GET /cambios REPASO tras 1 cambio (cliente al día, <30 s)",
+   "consultas": 16,
+   "db_ms": 5.6,
+   "ms": 9.1,
+   "p95_ms": 10.3,
+   "bytes": 6420,
+   "gzip_bytes": 1893,
+   "estado": 200,
+   "max_repetida": 1
+  },
+  {
+   "nombre": "GET /cambios con 10 tarjetas nuevas",
+   "consultas": 16,
+   "db_ms": 6.7,
+   "ms": 12.8,
+   "p95_ms": 13.5,
+   "bytes": 63070,
+   "gzip_bytes": 4653,
+   "estado": 200,
+   "max_repetida": 2
+  },
+  {
+   "nombre": "GET /cambios REPASO tras 10 cambios (hasta 20 tarjetas)",
+   "consultas": 16,
+   "db_ms": 6.8,
+   "ms": 13.0,
+   "p95_ms": 15.2,
+   "bytes": 63070,
+   "gzip_bytes": 4653,
+   "estado": 200,
+   "max_repetida": 2
+  },
+  {
+   "nombre": "POST cambiar-estado (En proceso → Terminado)",
+   "consultas": 10,
+   "db_ms": 2.9,
+   "ms": 4.8,
+   "p95_ms": 6.2,
+   "bytes": 59,
+   "gzip_bytes": 76,
+   "estado": 200,
+   "max_repetida": 3
+  }
+ ],
+ "explain": [
+  {
+   "sql": "SELECT pedidos.id_pedido AS pedidos_id_pedido, pedidos.folio AS pedidos_folio, pedidos.nombre_cliente AS pedidos_nombre_cliente, pedidos.telefono_cliente AS pedidos_telefono_cliente, pedidos.id_cliente AS pedidos_id_cliente, pedidos.id_lista_precio AS pedidos_",
+   "veces": 12,
+   "total_ms": 132.4,
+   "ejecucion_ms": 16.51,
+   "seq_scan": [
+    "->  Seq Scan on pedidos",
+    "->  Seq Scan on detalle_pedido"
+   ],
+   "plan": [
+    "Limit  (cost=16784.22..16784.27 rows=21 width=155) (actual time=16.435..16.439 rows=21.00 loops=1)",
+    "  Buffers: shared hit=104",
+    "  ->  Sort  (cost=16784.22..16786.74 rows=1008 width=155) (actual time=16.433..16.435 rows=21.00 loops=1)",
+    "        Sort Key: (CASE WHEN (lower((pedidos.folio)::text) = 'lona'::text) THEN 0 ELSE 1 END), pedidos.fecha_entrega DESC, pedidos.id_pedido DESC",
+    "        Sort Method: top-N heapsort  Memory: 33kB",
+    "        Buffers: shared hit=104",
+    "        ->  Seq Scan on pedidos  (cost=0.00..16757.04 rows=1008 width=155) (actual time=12.373..16.111 rows=563.00 loops=1)",
+    "              Filter: (((folio)::text ~~* '%lona%'::text) OR (translate(lower((nombre_cliente)::text), 'áéíóúüñÁÉÍÓÚÜÑ'::text, 'aeiouunaeiouun'::text) ~~* '%lona%'::text) OR (ANY (id_pedido = (hashed SubPlan 2).col1)))",
+    "              Rows Removed by Filter: 1437",
+    "              Buffers: shared hit=104",
+    "              SubPlan 2",
+    "                ->  Seq Scan on detalle_pedido  (cost=0.00..144.10 rows=40 width=4) (actual time=0.050..12.080 rows=630.00 loops=1)",
+    "                      Filter: (translate(lower(descripcion), 'áéíóúüñÁÉÍÓÚÜÑ'::text, 'aeiouunaeiouun'::text) ~~* '%lona%'::text)",
+    "                      Rows Removed by Filter: 4347",
+    "                      Buffers: shared hit=57",
+    "Planning Time: 0.343 ms",
+    "Execution Time: 16.510 ms"
+   ]
+  },
+  {
+   "sql": "SELECT pedidos.id_pedido AS pedidos_id_pedido, pedidos.folio AS pedidos_folio, pedidos.nombre_cliente AS pedidos_nombre_cliente, pedidos.telefono_cliente AS pedidos_telefono_cliente, pedidos.id_cliente AS pedidos_id_cliente, pedidos.id_lista_precio AS pedidos_",
+   "veces": 24,
+   "total_ms": 93.4,
+   "ejecucion_ms": 2.894,
+   "seq_scan": [
+    "->  Seq Scan on pedidos"
+   ],
+   "plan": [
+    "Limit  (cost=89.56..89.61 rows=21 width=155) (actual time=2.863..2.866 rows=21.00 loops=1)",
+    "  Buffers: shared hit=47",
+    "  ->  Sort  (cost=89.56..89.76 rows=80 width=155) (actual time=2.862..2.864 rows=21.00 loops=1)",
+    "        Sort Key: (CASE WHEN (lower((folio)::text) = 'ana'::text) THEN 0 ELSE 1 END), fecha_entrega DESC, id_pedido DESC",
+    "        Sort Method: top-N heapsort  Memory: 30kB",
+    "        Buffers: shared hit=47",
+    "        ->  Seq Scan on pedidos  (cost=0.00..87.40 rows=80 width=155) (actual time=0.025..2.756 rows=232.00 loops=1)",
+    "              Filter: (((folio)::text ~~* '%Ana%'::text) OR (translate(lower((nombre_cliente)::text), 'áéíóúüñÁÉÍÓÚÜÑ'::text, 'aeiouunaeiouun'::text) ~~* '%ana%'::text))",
+    "              Rows Removed by Filter: 1768",
+    "              Buffers: shared hit=47",
+    "Planning Time: 0.136 ms",
+    "Execution Time: 2.894 ms"
+   ]
+  },
+  {
+   "sql": "SELECT count(*) AS count_1 FROM (SELECT pedidos.id_pedido AS pedidos_id_pedido, pedidos.folio AS pedidos_folio, pedidos.nombre_cliente AS pedidos_nombre_cliente, pedidos.telefono_cliente AS pedidos_telefono_cliente, pedidos.id_cliente AS pedidos_id_cliente, pe",
+   "veces": 89,
+   "total_ms": 92.1,
+   "ejecucion_ms": 0.357,
+   "seq_scan": [
+    "->  Seq Scan on pedidos"
+   ],
+   "plan": [
+    "Aggregate  (cost=76.40..76.41 rows=1 width=8) (actual time=0.345..0.346 rows=1.00 loops=1)",
+    "  Buffers: shared hit=47",
+    "  ->  Seq Scan on pedidos  (cost=0.00..72.00 rows=1760 width=0) (actual time=0.028..0.258 rows=1760.00 loops=1)",
+    "        Filter: ((estatus)::text = 'Entregado'::text)",
+    "        Rows Removed by Filter: 240",
+    "        Buffers: shared hit=47",
+    "Planning Time: 0.048 ms",
+    "Execution Time: 0.357 ms"
+   ]
+  },
+  {
+   "sql": "SELECT usuarios.id_usuario, usuarios.nombre, usuarios.correo, usuarios.password_hash, usuarios.telefono, usuarios.rol, usuarios.activo FROM usuarios WHERE usuarios.id_usuario = %(pk_1)s::INTEGER",
+   "veces": 299,
+   "total_ms": 81.8,
+   "ejecucion_ms": 0.008,
+   "seq_scan": [
+    "Seq Scan on usuarios"
+   ],
+   "plan": [
+    "Seq Scan on usuarios  (cost=0.00..1.06 rows=1 width=215) (actual time=0.004..0.004 rows=1.00 loops=1)",
+    "  Filter: (id_usuario = 1)",
+    "  Rows Removed by Filter: 4",
+    "  Buffers: shared hit=1",
+    "Planning Time: 0.038 ms",
+    "Execution Time: 0.008 ms"
+   ]
+  },
+  {
+   "sql": "SELECT pagos.id_pedido, pagos.id_pago, pagos.monto, pagos.iva, pagos.comision, pagos.metodo_pago, pagos.fecha_pago FROM pagos WHERE pagos.id_pedido IN (%(primary_keys_1)s::INTEGER, %(primary_keys_2)s::INTEGER, %(primary_keys_3)s::INTEGER, %(primary_keys_4)s::I",
+   "veces": 65,
+   "total_ms": 55.2,
+   "ejecucion_ms": 0.074,
+   "seq_scan": [],
+   "plan": [
+    "Sort  (cost=29.10..29.43 rows=132 width=39) (actual time=0.060..0.063 rows=75.00 loops=1)",
+    "  Sort Key: fecha_pago, id_pago",
+    "  Sort Method: quicksort  Memory: 29kB",
+    "  Buffers: shared hit=4",
+    "  ->  Index Scan using ix_pagos_id_pedido on pagos  (cost=0.28..24.45 rows=132 width=39) (actual time=0.023..0.038 rows=75.00 loops=1)",
+    "        Index Cond: (id_pedido = ANY ('{161,162,163,164,165,166,167,168,169,170,171,172,173,174,175,176,177,178,179,180,181,182,183,184,185,186,187,188,189,190,191,192,193,194,195,196,197,198,199,200,201,202,203,204,205,206,207,208,209,210,211,212,213,214,215,216,217,218,219,220,221,222,223,224,225,226,227,228,229,230,231,232,233,234,235,236,237,238,239,240}'::integer[]))",
+    "        Index Searches: 1",
+    "        Buffers: shared hit=4",
+    "Planning Time: 0.162 ms",
+    "Execution Time: 0.074 ms"
+   ]
+  },
+  {
+   "sql": "SELECT usuarios.id_usuario, usuarios.nombre, usuarios.correo, usuarios.password_hash, usuarios.telefono, usuarios.rol, usuarios.activo FROM usuarios WHERE usuarios.id_usuario IN (%(primary_keys_1)s::INTEGER, %(primary_keys_2)s::INTEGER, %(primary_keys_3)s::INT",
+   "veces": 228,
+   "total_ms": 50.8,
+   "ejecucion_ms": 0.007,
+   "seq_scan": [
+    "Seq Scan on usuarios"
+   ],
+   "plan": [
+    "Seq Scan on usuarios  (cost=0.00..1.07 rows=3 width=215) (actual time=0.004..0.004 rows=3.00 loops=1)",
+    "  Filter: (id_usuario = ANY ('{5,3,4}'::integer[]))",
+    "  Rows Removed by Filter: 2",
+    "  Buffers: shared hit=1",
+    "Planning Time: 0.021 ms",
+    "Execution Time: 0.007 ms"
+   ]
+  },
+  {
+   "sql": "SELECT bitacora.id_bitacora AS bitacora_id_bitacora, bitacora.id_entidad AS bitacora_id_entidad, bitacora.accion AS bitacora_accion FROM bitacora WHERE bitacora.entidad = %(entidad_1)s::VARCHAR AND bitacora.accion IN (%(accion_1_1)s::VARCHAR, %(accion_1_2)s::V",
+   "veces": 112,
+   "total_ms": 47.9,
+   "ejecucion_ms": 0.016,
+   "seq_scan": [],
+   "plan": [
+    "Limit  (cost=12.63..12.63 rows=1 width=21) (actual time=0.007..0.007 rows=0.00 loops=1)",
+    "  Buffers: shared hit=4",
+    "  ->  Sort  (cost=12.63..12.63 rows=1 width=21) (actual time=0.006..0.007 rows=0.00 loops=1)",
+    "        Sort Key: id_bitacora",
+    "        Sort Method: quicksort  Memory: 25kB",
+    "        Buffers: shared hit=4",
+    "        ->  Bitmap Heap Scan on bitacora  (cost=8.59..12.62 rows=1 width=21) (actual time=0.005..0.005 rows=0.00 loops=1)",
+    "              Recheck Cond: ((id_bitacora > 19845) OR (fecha >= '2026-11-20 00:48:30.004206'::timestamp without time zone))",
+    "              Filter: ((id_entidad IS NOT NULL) AND ((entidad)::text = 'pedido'::text) AND ((accion)::text = ANY ('{PEDIDO_CREADO,PEDIDO_EDITADO,PEDIDO_ESTADO,PEDIDO_ABONO,PEDIDO_CANCELADO,PRODUCTO_TERMINADO}'::text[])) AND ((id_bitacora > 19845) OR ((id_bitacora > 19825) AND (fecha >= '2026-11-20 00:48:30.004206'::timestamp without time zone))))",
+    "              Buffers: shared hit=4",
+    "              ->  BitmapOr  (cost=8.59..8.59 rows=1 width=0) (actual time=0.003..0.003 rows=0.00 loops=1)",
+    "                    Buffers: shared hit=4",
+    "                    ->  Bitmap Index Scan on bitacora_pkey  (cost=0.00..4.29 rows=1 width=0) (actual time=0.001..0.001 rows=0.00 loops=1)",
+    "                          Index Cond: (id_bitacora > 19845)",
+    "                          Index Searches: 1",
+    "                          Buffers: shared hit=2",
+    "                    ->  Bitmap Index Scan on ix_bitacora_fecha  (cost=0.00..4.29 rows=1 width=0) (actual time=0.001..0.001 rows=0.00 loops=1)",
+    "                          Index Cond: (fecha >= '2026-11-20 00:48:30.004206'::timestamp without time zone)",
+    "                          Index Searches: 1",
+    "                          Buffers: shared hit=2",
+    "Planning:",
+    "  Buffers: shared hit=12",
+    "Planning Time: 0.107 ms",
+    "Execution Time: 0.016 ms"
+   ]
+  },
+  {
+   "sql": "SELECT pedidos.id_pedido AS pedidos_id_pedido, pedidos.folio AS pedidos_folio, pedidos.nombre_cliente AS pedidos_nombre_cliente, pedidos.telefono_cliente AS pedidos_telefono_cliente, pedidos.id_cliente AS pedidos_id_cliente, pedidos.id_lista_precio AS pedidos_",
+   "veces": 12,
+   "total_ms": 43.5,
+   "ejecucion_ms": 2.482,
+   "seq_scan": [
+    "->  Seq Scan on pedidos"
+   ],
+   "plan": [
+    "Limit  (cost=87.02..87.02 rows=1 width=155) (actual time=2.465..2.466 rows=1.00 loops=1)",
+    "  Buffers: shared hit=47",
+    "  ->  Sort  (cost=87.02..87.02 rows=1 width=155) (actual time=2.464..2.465 rows=1.00 loops=1)",
+    "        Sort Key: (CASE WHEN (lower((folio)::text) = 'prb00123'::text) THEN 0 WHEN ((folio)::text ~~* '%PRB00123%'::text) THEN 1 ELSE 2 END), fecha_entrega DESC, id_pedido DESC",
+    "        Sort Method: quicksort  Memory: 25kB",
+    "        Buffers: shared hit=47",
+    "        ->  Seq Scan on pedidos  (cost=0.00..87.01 rows=1 width=155) (actual time=0.141..2.460 rows=1.00 loops=1)",
+    "              Filter: (((folio)::text ~~* '%PRB00123%'::text) OR (translate(lower((nombre_cliente)::text), 'áéíóúüñÁÉÍÓÚÜÑ'::text, 'aeiouunaeiouun'::text) ~~* '%prb00123%'::text))",
+    "              Rows Removed by Filter: 1999",
+    "              Buffers: shared hit=47",
+    "Planning Time: 0.074 ms",
+    "Execution Time: 2.482 ms"
+   ]
+  },
+  {
+   "sql": "SELECT pedidos.id_pedido AS pedidos_id_pedido, pedidos.folio AS pedidos_folio, pedidos.nombre_cliente AS pedidos_nombre_cliente, pedidos.telefono_cliente AS pedidos_telefono_cliente, pedidos.id_cliente AS pedidos_id_cliente, pedidos.id_lista_precio AS pedidos_",
+   "veces": 58,
+   "total_ms": 41.7,
+   "ejecucion_ms": 0.236,
+   "seq_scan": [
+    "Seq Scan on pedidos"
+   ],
+   "plan": [
+    "Seq Scan on pedidos  (cost=0.00..72.00 rows=80 width=151) (actual time=0.021..0.226 rows=80.00 loops=1)",
+    "  Filter: ((estatus)::text = 'Terminado'::text)",
+    "  Rows Removed by Filter: 1920",
+    "  Buffers: shared hit=47",
+    "Planning Time: 0.038 ms",
+    "Execution Time: 0.236 ms"
+   ]
+  },
+  {
+   "sql": "SELECT pedido_responsables.id_pedido, usuarios.id_usuario, usuarios.nombre, usuarios.correo, usuarios.password_hash, usuarios.telefono, usuarios.rol, usuarios.activo FROM pedido_responsables JOIN usuarios ON usuarios.id_usuario = pedido_responsables.id_usuario",
+   "veces": 38,
+   "total_ms": 29.6,
+   "ejecucion_ms": 0.138,
+   "seq_scan": [
+    "->  Seq Scan on usuarios"
+   ],
+   "plan": [
+    "Sort  (cost=24.80..24.92 rows=46 width=219) (actual time=0.119..0.121 rows=48.00 loops=1)",
+    "  Sort Key: usuarios.nombre",
+    "  Sort Method: quicksort  Memory: 33kB",
+    "  Buffers: shared hit=22",
+    "  ->  Hash Join  (cost=1.39..23.53 rows=46 width=219) (actual time=0.022..0.102 rows=48.00 loops=1)",
+    "        Hash Cond: (pedido_responsables.id_usuario = usuarios.id_usuario)",
+    "        Buffers: shared hit=22",
+    "        ->  Index Only Scan using pedido_responsables_pkey on pedido_responsables  (cost=0.28..22.20 rows=46 width=8) (actual time=0.010..0.081 rows=48.00 loops=1)",
+    "              Index Cond: (id_pedido = ANY ('{1155,1412,717,1332,1515,1357,608,1458,1262,1757,931,900,1812,636,905,1640,1873,353,459,278,1078,332,871,1527,1473,1033,1537,1808,1388,485,869}'::integer[]))",
+    "              Heap Fetches: 0",
+    "              Index Searches: 10",
+    "              Buffers: shared hit=21",
+    "        ->  Hash  (cost=1.05..1.05 rows=5 width=215) (actual time=0.009..0.009 rows=5.00 loops=1)",
+    "              Buckets: 1024  Batches: 1  Memory Usage: 9kB",
+    "              Buffers: shared hit=1",
+    "              ->  Seq Scan on usuarios  (cost=0.00..1.05 rows=5 width=215) (actual time=0.003..0.004 rows=5.00 loops=1)",
+    "                    Buffers: shared hit=1",
+    "Planning:",
+    "  Buffers: shared hit=2",
+    "Planning Time: 0.146 ms",
+    "Execution Time: 0.138 ms"
+   ]
+  }
+ ],
+ "estructura": {
+  "tablas": [
+   {
+    "tabla": "bitacora",
+    "filas": 19845,
+    "tamano": "2560 kB",
+    "seq_scan": 7,
+    "seq_tup_read": 59535,
+    "idx_scan": 1878
+   },
+   {
+    "tabla": "detalle_asignaciones",
+    "filas": 2541,
+    "tamano": "144 kB",
+    "seq_scan": 5,
+    "seq_tup_read": 7623,
+    "idx_scan": 1505
+   },
+   {
+    "tabla": "detalle_pedido",
+    "filas": 4977,
+    "tamano": "496 kB",
+    "seq_scan": 40,
+    "seq_tup_read": 184149,
+    "idx_scan": 4284
+   },
+   {
+    "tabla": "notificaciones",
+    "filas": 3680,
+    "tamano": "560 kB",
+    "seq_scan": 7,
+    "seq_tup_read": 11040,
+    "idx_scan": 271
+   },
+   {
+    "tabla": "pagos",
+    "filas": 2849,
+    "tamano": "240 kB",
+    "seq_scan": 2,
+    "seq_tup_read": 0,
+    "idx_scan": 3731
+   },
+   {
+    "tabla": "pedido_responsables",
+    "filas": 3025,
+    "tamano": "144 kB",
+    "seq_scan": 85,
+    "seq_tup_read": 254100,
+    "idx_scan": 1944
+   },
+   {
+    "tabla": "pedidos",
+    "filas": 2000,
+    "tamano": "416 kB",
+    "seq_scan": 834,
+    "seq_tup_read": 1650183,
+    "idx_scan": 17111
+   },
+   {
+    "tabla": "usuarios",
+    "filas": 5,
+    "tamano": "16 kB",
+    "seq_scan": 2840,
+    "seq_tup_read": 13837,
+    "idx_scan": 31466
+   }
+  ],
+  "indices": [
+   {
+    "tabla": "bitacora",
+    "indice": "bitacora_pkey",
+    "idx_scan": 1204,
+    "tamano": "456 kB",
+    "definicion": "CREATE UNIQUE INDEX bitacora_pkey ON public.bitacora USING btree (id_bitacora)"
+   },
+   {
+    "tabla": "bitacora",
+    "indice": "ix_bitacora_accion",
+    "idx_scan": 0,
+    "tamano": "168 kB",
+    "definicion": "CREATE INDEX ix_bitacora_accion ON public.bitacora USING btree (accion)"
+   },
+   {
+    "tabla": "bitacora",
+    "indice": "ix_bitacora_fecha",
+    "idx_scan": 674,
+    "tamano": "400 kB",
+    "definicion": "CREATE INDEX ix_bitacora_fecha ON public.bitacora USING btree (fecha)"
+   },
+   {
+    "tabla": "bitacora",
+    "indice": "ix_bitacora_id_usuario",
+    "idx_scan": 0,
+    "tamano": "160 kB",
+    "definicion": "CREATE INDEX ix_bitacora_id_usuario ON public.bitacora USING btree (id_usuario)"
+   },
+   {
+    "tabla": "detalle_asignaciones",
+    "indice": "detalle_asignaciones_pkey",
+    "idx_scan": 1505,
+    "tamano": "72 kB",
+    "definicion": "CREATE UNIQUE INDEX detalle_asignaciones_pkey ON public.detalle_asignaciones USING btree (id_detalle)"
+   },
+   {
+    "tabla": "detalle_asignaciones",
+    "indice": "ix_detalle_asignaciones_id_usuario",
+    "idx_scan": 0,
+    "tamano": "40 kB",
+    "definicion": "CREATE INDEX ix_detalle_asignaciones_id_usuario ON public.detalle_asignaciones USING btree (id_usuario)"
+   },
+   {
+    "tabla": "detalle_pedido",
+    "indice": "detalle_pedido_pkey",
+    "idx_scan": 2547,
+    "tamano": "128 kB",
+    "definicion": "CREATE UNIQUE INDEX detalle_pedido_pkey ON public.detalle_pedido USING btree (id_detalle)"
+   },
+   {
+    "tabla": "detalle_pedido",
+    "indice": "ix_detalle_pedido_id_pedido",
+    "idx_scan": 1737,
+    "tamano": "96 kB",
+    "definicion": "CREATE INDEX ix_detalle_pedido_id_pedido ON public.detalle_pedido USING btree (id_pedido)"
+   },
+   {
+    "tabla": "detalle_pedido",
+    "indice": "ix_detalle_pedido_id_producto",
+    "idx_scan": 0,
+    "tamano": "48 kB",
+    "definicion": "CREATE INDEX ix_detalle_pedido_id_producto ON public.detalle_pedido USING btree (id_producto)"
+   },
+   {
+    "tabla": "notificaciones",
+    "indice": "ix_notif_usuario_leida",
+    "idx_scan": 132,
+    "tamano": "48 kB",
+    "definicion": "CREATE INDEX ix_notif_usuario_leida ON public.notificaciones USING btree (id_usuario, leida)"
+   },
+   {
+    "tabla": "notificaciones",
+    "indice": "ix_notificaciones_fecha",
+    "idx_scan": 66,
+    "tamano": "48 kB",
+    "definicion": "CREATE INDEX ix_notificaciones_fecha ON public.notificaciones USING btree (fecha)"
+   },
+   {
+    "tabla": "notificaciones",
+    "indice": "ix_notificaciones_id_usuario",
+    "idx_scan": 66,
+    "tamano": "48 kB",
+    "definicion": "CREATE INDEX ix_notificaciones_id_usuario ON public.notificaciones USING btree (id_usuario)"
+   },
+   {
+    "tabla": "notificaciones",
+    "indice": "notificaciones_pkey",
+    "idx_scan": 7,
+    "tamano": "96 kB",
+    "definicion": "CREATE UNIQUE INDEX notificaciones_pkey ON public.notificaciones USING btree (id_notificacion)"
+   },
+   {
+    "tabla": "pagos",
+    "indice": "ix_pagos_id_pedido",
+    "idx_scan": 3731,
+    "tamano": "80 kB",
+    "definicion": "CREATE INDEX ix_pagos_id_pedido ON public.pagos USING btree (id_pedido)"
+   },
+   {
+    "tabla": "pagos",
+    "indice": "pagos_pkey",
+    "idx_scan": 0,
+    "tamano": "80 kB",
+    "definicion": "CREATE UNIQUE INDEX pagos_pkey ON public.pagos USING btree (id_pago)"
+   },
+   {
+    "tabla": "pedido_responsables",
+    "indice": "pedido_responsables_pkey",
+    "idx_scan": 1944,
+    "tamano": "104 kB",
+    "definicion": "CREATE UNIQUE INDEX pedido_responsables_pkey ON public.pedido_responsables USING btree (id_pedido, id_usuario)"
+   },
+   {
+    "tabla": "pedidos",
+    "indice": "ix_pedidos_id_cliente",
+    "idx_scan": 2,
+    "tamano": "32 kB",
+    "definicion": "CREATE INDEX ix_pedidos_id_cliente ON public.pedidos USING btree (id_cliente)"
+   },
+   {
+    "tabla": "pedidos",
+    "indice": "pedidos_folio_key",
+    "idx_scan": 1,
+    "tamano": "80 kB",
+    "definicion": "CREATE UNIQUE INDEX pedidos_folio_key ON public.pedidos USING btree (folio)"
+   },
+   {
+    "tabla": "pedidos",
+    "indice": "pedidos_pkey",
+    "idx_scan": 17108,
+    "tamano": "64 kB",
+    "definicion": "CREATE UNIQUE INDEX pedidos_pkey ON public.pedidos USING btree (id_pedido)"
+   },
+   {
+    "tabla": "usuarios",
+    "indice": "usuarios_correo_key",
+    "idx_scan": 5,
+    "tamano": "16 kB",
+    "definicion": "CREATE UNIQUE INDEX usuarios_correo_key ON public.usuarios USING btree (correo)"
+   },
+   {
+    "tabla": "usuarios",
+    "indice": "usuarios_pkey",
+    "idx_scan": 31461,
+    "tamano": "16 kB",
+    "definicion": "CREATE UNIQUE INDEX usuarios_pkey ON public.usuarios USING btree (id_usuario)"
+   }
+  ]
+ },
+ "cuando": "2026-11-20T00:49:01",
+ "base": "printflow_perf",
+ "carga_estimada": {
+  "clientes": 6,
+  "hilos": 16,
+  "filas": [
+   {
+    "sondeo": "tablero /cambios (3 s)",
+    "peticiones_min": 120,
+    "consultas_min": 240,
+    "ms_servidor_min": 132,
+    "kb_min": 5.2
+   },
+   {
+    "sondeo": "notificaciones (30 s)",
+    "peticiones_min": 12,
+    "consultas_min": 48,
+    "ms_servidor_min": 18,
+    "kb_min": 16.2
+   },
+   {
+    "sondeo": "cola etiquetas (5 s)",
+    "peticiones_min": 72,
+    "consultas_min": 72,
+    "ms_servidor_min": 29,
+    "kb_min": 12.5
+   }
+  ],
+  "peticiones_min": 204,
+  "consultas_min": 360,
+  "ms_servidor_min": 179,
+  "ocupacion_hilos_pct": 0.02,
+  "ocupacion_un_hilo_pct": 0.3
+ },
+ "js": {
+  "totales": {
+   "setInterval": 4,
+   "setTimeout": 21,
+   "addEventListener": 116,
+   "MutationObserver": 0,
+   "IntersectionObserver": 1,
+   "ResizeObserver": 2,
+   "fetch": 21,
+   "visibilitychange": 2,
+   "querySelectorAll": 56,
+   "normalize(NFD)": 3
+  },
+  "intervalos": [
+   "templates/base.html:607: if (enTablero && !revisionPeriodica) revisionPeriodica = setInterval(evaluarPendientes, 50",
+   "templates/base.html:709: setInterval(() => { if (!document.hidden) cargarNotificaciones(); }, 30000);",
+   "templates/base.html:754: setInterval(consultarCola, 5000);",
+   "templates/dashboard.html:1183: setInterval(actualizarFechasTarjetas, 60000);"
+  ]
+ }
+}

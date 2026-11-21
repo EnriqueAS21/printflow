@@ -1,0 +1,48 @@
+{# Detalle de pedido en solo lectura (rol Produccion). Requiere la variable `pedido`. #}
+<div class="modal fade" id="modalVer-{{ pedido.id_pedido }}" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" style="max-width: 600px;">
+    <div class="modal-content border-0 rounded-4 shadow">
+
+      <div class="modal-header border-0" style="background:#0088FF;color:#fff;">
+        <h5 class="modal-title fw-bold">Pedido {{ pedido.folio }}</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+
+      <div class="modal-body">
+        <div class="mb-2">
+          <span class="text-muted small">Cliente:</span>
+          <div class="fw-bold">{{ pedido.nombre_cliente }}</div>
+        </div>
+
+        <div class="mb-2">
+          <span class="text-muted small">Entrega:</span>
+          <div class="fw-bold">
+            {{ pedido.fecha_entrega.strftime('%d/%m/%Y %I:%M %p') if pedido.fecha_entrega else '—' }}
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <span class="text-muted small d-block">Responsables:</span>
+          {% for r in pedido.responsables_asignados %}
+            <span class="badge bg-primary rounded-pill px-3 py-2 me-1">{{ r.nombre }}</span>
+          {% else %}
+            <span class="badge bg-secondary rounded-pill px-3 py-2">Sin asignar</span>
+          {% endfor %}
+        </div>
+
+        <h6 class="fw-bold">Productos</h6>
+        <ul class="list-group mb-3">
+          {% for d in pedido.detalles %}
+            <li class="list-group-item">{{ '%g'|format(d.cantidad|float) }} × {{ d.descripcion }}</li>
+          {% else %}
+            <li class="list-group-item text-muted">Sin productos.</li>
+          {% endfor %}
+        </ul>
+
+        <h6 class="fw-bold">Notas</h6>
+        <div class="p-3 bg-light rounded-3" style="white-space: pre-wrap;">{{ pedido.notas or 'Sin notas.' }}</div>
+      </div>
+
+    </div>
+  </div>
+</div>
