@@ -317,6 +317,9 @@
                             {% if ver_nota %}
                             <li><a class="dropdown-item {% if request.blueprint == 'configuracion' %}active{% endif %}" href="{{ url_for('configuracion.nota') }}">Diseño Nota</a></li>
                             {% endif %}
+                            {% if puede('productos.administrar') and modulo_activo('configuracion') %}
+                            <li><a class="dropdown-item {% if request.endpoint == 'configuracion.procesos' %}active{% endif %}" href="{{ url_for('configuracion.procesos') }}">Procesos de producción</a></li>
+                            {% endif %}
                             {% if ver_reportes %}
                             <li><a class="dropdown-item {% if request.blueprint == 'reportes' %}active{% endif %}" href="{{ url_for('reportes.index') }}">Reportes</a></li>
                             {% endif %}

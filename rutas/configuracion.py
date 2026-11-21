@@ -15,6 +15,11 @@ from modelos.configuracion_nota import (
     normalizar_apartados,
     obtener_configuracion_nota,
 )
+from modelos.producto import Producto
+from modelos.produccion import (
+    LineaPaso, ProductoPaso, Proceso, ReglaClasificacion, ReglaPaso,
+)
+from servicios.rutas_produccion import invalidar
 from servicios.permisos import permiso_requerido
 
 configuracion_bp = Blueprint("configuracion", __name__, template_folder="../templates")
@@ -128,3 +133,116 @@ def nota():
         configuracion = db.session.get(ConfiguracionNota, 1)
 
     return render_template("configuracion/nota.html", configuracion=configuracion, apartados=apartados)
+
+
+def _es_sin_clasificar(proceso):
+    return bool(proceso.es_sistema) or (proceso.nombre or "").strip().lower() == "sin clasificar"
+
+
+def _proceso_en_uso(proceso):
+    return bool(
+        db.session.query(ProductoPaso.id_producto_paso)
+        .filter(ProductoPaso.id_proceso == proceso.id_proceso)
+        .first()
+        or db.session.query(Producto.id_producto)
+        .filter(Producto.id_proceso_principal == proceso.id_proceso)
+        .first()
+        or db.session.query(ReglaPaso.id_regla_paso)
+        .filter(ReglaPaso.id_proceso == proceso.id_proceso)
+        .first()
+        or db.session.query(ReglaClasificacion.id_regla)
+        .filter(ReglaClasificacion.id_proceso_principal == proceso.id_proceso)
+        .first()
+        or db.session.query(LineaPaso.id_linea_paso)
+        .filter(LineaPaso.id_proceso == proceso.id_proceso)
+        .first()
+    )
+
+
+@configuracion_bp.route("/procesos", methods=["GET", "POST"])
+@permiso_requerido("productos.administrar")
+def procesos():
+    if request.method == "POST":
+        accion = (request.form.get("accion") or "").strip()
+        try:
+            if accion == "crear":
+                nombre = (request.form.get("nombre") or "").strip()
+                if not nombre:
+                    raise ValueError("El nombre del proceso es obligatorio.")
+                if len(nombre) > 80:
+                    raise ValueError("El nombre no puede superar 80 caracteres.")
+                if nombre.lower() == "sin clasificar":
+                    raise ValueError('"Sin clasificar" está reservado.')
+                existente = Proceso.query.filter(db.func.lower(Proceso.nombre) == nombre.lower()).first()
+                if existente is not None:
+                    raise ValueError("Ya existe un proceso con ese nombre.")
+                ultimo = db.session.query(db.func.max(Proceso.orden)).scalar() or 0
+                db.session.add(Proceso(nombre=nombre, orden=ultimo + 1, activo=True, es_sistema=False))
+                db.session.commit()
+                invalidar()
+                flash("Proceso creado.", "success")
+                return redirect(url_for("configuracion.procesos"))
+
+            id_proceso = int(request.form.get("id_proceso") or 0)
+            proceso = db.session.get(Proceso, id_proceso)
+            if proceso is None:
+                raise ValueError("El proceso no existe.")
+
+            if accion == "editar":
+                if _es_sin_clasificar(proceso):
+                    raise ValueError('"Sin clasificar" no se puede editar.')
+                nombre = (request.form.get("nombre") or "").strip()
+                if not nombre:
+                    raise ValueError("El nombre del proceso es obligatorio.")
+                if len(nombre) > 80:
+                    raise ValueError("El nombre no puede superar 80 caracteres.")
+                duplicado = (
+                    Proceso.query
+                    .filter(db.func.lower(Proceso.nombre) == nombre.lower(), Proceso.id_proceso != proceso.id_proceso)
+                    .first()
+                )
+                if duplicado is not None:
+                    raise ValueError("Ya existe un proceso con ese nombre.")
+                proceso.nombre = nombre
+
+            elif accion == "activar":
+                if _es_sin_clasificar(proceso):
+                    raise ValueError('"Sin clasificar" no se puede desactivar.')
+                proceso.activo = not bool(proceso.activo)
+
+            elif accion in ("subir", "bajar"):
+                lista = Proceso.query.order_by(Proceso.orden, Proceso.nombre, Proceso.id_proceso).all()
+                indice = next((i for i, fila in enumerate(lista) if fila.id_proceso == proceso.id_proceso), None)
+                vecino = indice - 1 if accion == "subir" else indice + 1
+                if indice is not None and 0 <= vecino < len(lista):
+                    otra = lista[vecino]
+                    proceso.orden, otra.orden = otra.orden, proceso.orden
+
+            elif accion == "eliminar":
+                if _es_sin_clasificar(proceso):
+                    raise ValueError('"Sin clasificar" no se puede borrar.')
+                if proceso.activo and _proceso_en_uso(proceso):
+                    proceso.activo = False
+                    raise ValueError("El proceso está en uso y solo puede desactivarse.")
+                if _proceso_en_uso(proceso):
+                    raise ValueError("El proceso está en uso y solo puede desactivarse.")
+                db.session.delete(proceso)
+
+            else:
+                raise ValueError("Acción no válida.")
+
+            registrar("PROCESO_EDITADO", "proceso", proceso.id_proceso, f"{accion}: {proceso.nombre}")
+            db.session.commit()
+            invalidar()
+            flash("Procesos actualizados.", "success")
+        except ValueError as exc:
+            db.session.rollback()
+            flash(str(exc), "warning")
+        except Exception:
+            db.session.rollback()
+            current_app.logger.exception("Error al guardar procesos")
+            flash("No se pudo guardar el proceso.", "danger")
+        return redirect(url_for("configuracion.procesos"))
+
+    procesos = Proceso.query.order_by(Proceso.orden, Proceso.nombre, Proceso.id_proceso).all()
+    return render_template("configuracion/procesos.html", procesos=procesos)
