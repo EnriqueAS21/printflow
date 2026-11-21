@@ -164,7 +164,7 @@ def _proceso_en_uso(proceso):
 
 
 @configuracion_bp.route("/procesos", methods=["GET", "POST"])
-@permiso_requerido("productos.administrar")
+@permiso_requerido("productos.administrar", estricto=True)
 def procesos():
     if request.method == "POST":
         datos_json = request.get_json(silent=True)
@@ -279,7 +279,8 @@ def procesos():
             registrar("PROCESO_EDITADO", "proceso", proceso.id_proceso, f"{accion}: {proceso.nombre}")
             db.session.commit()
             invalidar()
-            flash("Procesos actualizados.", "success")
+            if not (es_ajax or accion == "reordenar"):
+                flash("Procesos actualizados.", "success")
             if es_ajax or accion == "reordenar":
                 respuesta = {
                     "ok": True,
@@ -295,15 +296,15 @@ def procesos():
                 return jsonify(respuesta)
         except ValueError as exc:
             db.session.rollback()
-            flash(str(exc), "warning")
             if es_ajax or accion == "reordenar":
                 return jsonify(ok=False, error=str(exc)), 400
+            flash(str(exc), "warning")
         except Exception:
             db.session.rollback()
             current_app.logger.exception("Error al guardar procesos")
-            flash("No se pudo guardar el proceso.", "danger")
             if es_ajax or accion == "reordenar":
                 return jsonify(ok=False, error="No se pudo guardar el proceso."), 500
+            flash("No se pudo guardar el proceso.", "danger")
         return redirect(url_for("configuracion.procesos"))
 
     todos = Proceso.query.order_by(Proceso.orden, Proceso.nombre, Proceso.id_proceso).all()
@@ -339,7 +340,7 @@ def _validar_ruta_regla(pasos, id_principal):
 
 
 @configuracion_bp.route("/reglas", methods=["GET", "POST"])
-@permiso_requerido("productos.administrar")
+@permiso_requerido("productos.administrar", estricto=True)
 def reglas():
     if request.method == "POST":
         datos_json = request.get_json(silent=True)
@@ -509,7 +510,8 @@ def reglas():
     )
     reglas = (
         ReglaClasificacion.query
-        .order_by(ReglaClasificacion.prioridad.desc(), ReglaClasificacion.palabra_clave)
+        .order_by(ReglaClasificacion.activo.desc(),
+                  ReglaClasificacion.prioridad.desc(), ReglaClasificacion.palabra_clave)
         .all()
     )
     datos_reglas = []

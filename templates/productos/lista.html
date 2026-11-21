@@ -7,9 +7,15 @@
 {% endblock %}
 
 {% block content %}
-<div class="container mt-4 mb-5 pf-form" style="max-width: 1150px;">
-    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-        <h4 class="mb-0 fw-bold">Productos</h4>
+<div class="container mb-5 pf-form pf-pagina-gutter" style="max-width: 1150px;">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div class="encabezado-pagina">
+            <span class="encabezado-pagina__icono" aria-hidden="true"><i class="bi bi-box-seam"></i></span>
+            <div class="encabezado-pagina__texto">
+                <h1 class="encabezado-pagina__titulo">Productos</h1>
+                <p class="encabezado-pagina__subtitulo">Catálogo, presentaciones y ruta de producción</p>
+            </div>
+        </div>
         {% if puede('productos.administrar') %}
         <a href="/productos/nuevo" class="btn btn-primary rounded-pill px-4">+ Nuevo producto</a>
         {% endif %}
@@ -58,8 +64,8 @@
                         <th>Clave</th>
                         <th>Nombre</th>
                         <th>Categoría</th>
-                        <th>Presentaciones</th>
-                        <th>Ruta</th>
+                        <th class="d-none d-md-table-cell">Presentaciones</th>
+                        <th class="d-none d-md-table-cell">Ruta</th>
                         <th class="text-nowrap">Desde $</th>
                         <th>Estatus</th>
                         {% if puede('productos.administrar') %}<th></th>{% endif %}
@@ -70,10 +76,12 @@
                     {% set producto = fila.producto %}
                     <tr>
                         <td class="text-muted">{{ producto.clave or '' }}</td>
-                        <td class="fw-semibold">{{ producto.nombre }}</td>
+                        <td class="fw-semibold">{{ producto.nombre }}
+                            <div class="small fw-normal d-md-none">{% if fila.ruta %}<span class="text-muted">{{ fila.ruta }}</span>{% else %}<span class="badge text-bg-warning">Sin ruta</span>{% endif %}</div>
+                        </td>
                         <td>{{ producto.categoria or '' }}</td>
-                        <td>{{ fila.presentaciones | map(attribute='nombre') | join(', ') }}</td>
-                        <td class="small">{% if fila.ruta %}{{ fila.ruta }}{% else %}<span class="badge text-bg-warning">Sin ruta</span>{% endif %}</td>
+                        <td class="d-none d-md-table-cell">{{ fila.presentaciones | map(attribute='nombre') | join(', ') }}</td>
+                        <td class="small d-none d-md-table-cell">{% if fila.ruta %}{{ fila.ruta }}{% else %}<span class="badge text-bg-warning">Sin ruta</span>{% endif %}</td>
                         <td class="text-nowrap">{% if fila.desde is not none %}${{ '%.2f'|format(fila.desde) }}{% else %}—{% endif %}</td>
                         <td>
                             {% if producto.activo %}

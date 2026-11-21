@@ -604,6 +604,7 @@
     {% endif %}
 
     {% include '_modal_efectivo.html' %}
+    {% include '_modal_confirmar.html' %}
 
     <script>
     // Modo DEBUG (entorno de desarrollo, app en debug, o localStorage.pfDebug = '1' en la consola del navegador):
@@ -626,6 +627,51 @@
 
     <!-- Bootstrap JS Bundle (local) -->
     <script src="{{ url_for('static', filename='vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+    <script>
+    // Menús reutilizables: posicionamiento fijo para que contenedores con
+    // overflow: hidden no recorten las opciones en móvil o escritorio.
+    (function () {
+        function configurar(botones) {
+            if (!window.bootstrap?.Dropdown) return;
+            botones.forEach(boton => {
+                if (boton.dataset.pfDropdownFixed === '1') return;
+                boton.dataset.pfDropdownFixed = '1';
+                window.bootstrap.Dropdown.getOrCreateInstance(boton, {
+                    popperConfig(defaults) {
+                        return {
+                            ...defaults,
+                            strategy: 'fixed',
+                            placement: 'bottom-end',
+                            modifiers: [
+                                ...(defaults.modifiers || []),
+                                { name: 'preventOverflow', options: { boundary: 'viewport', padding: 8 } },
+                                // En móvil la barra inferior tapa la parte baja de la pantalla: el menú se vuelca antes de llegar a ella.
+                                { name: 'flip', options: {
+                                    fallbackPlacements: ['top-end', 'bottom-start', 'top-start'],
+                                    padding: { top: 8, left: 8, right: 8, bottom: document.documentElement.dataset.modo === 'pestanas' ? 96 : 8 },
+                                } },
+                            ],
+                        };
+                    },
+                });
+            });
+        }
+        window.pfConfigurarDropdowns = raiz => configurar([
+            ...(raiz || document).querySelectorAll('[data-bs-toggle="dropdown"]'),
+        ]);
+        window.pfConfigurarDropdowns(document);
+        new MutationObserver(mutaciones => {
+            mutaciones.forEach(mutacion => {
+                mutacion.addedNodes.forEach(nodo => {
+                    if (!(nodo instanceof Element)) return;
+                    if (nodo.matches('[data-bs-toggle="dropdown"]')) configurar([nodo]);
+                    window.pfConfigurarDropdowns(nodo);
+                });
+            });
+        }).observe(document.documentElement, { childList: true, subtree: true });
+    })();
+    </script>
+    <script src="{{ url_for('static', filename='js/confirmar.js') }}"></script>
     <script src="{{ url_for('static', filename='js/modal_efectivo.js') }}"></script>
     {% set id_cliente_completar = session.pop('cliente_por_completar', None) %}
     {% set cliente_completar = obtener_cliente(id_cliente_completar) if id_cliente_completar and puede('clientes.crear') else none %}

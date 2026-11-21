@@ -2,7 +2,7 @@ import json
 import re
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
-from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, request, url_for
 from sqlalchemy import or_
 from sqlalchemy.orm import selectinload
 
@@ -155,7 +155,7 @@ def lista():
 
 
 @productos_bp.route('/<int:id_producto>/estado', methods=['POST'])
-@permiso_requerido('productos.administrar')
+@permiso_requerido('productos.administrar', estricto=True)
 def cambiar_estado(id_producto):
     producto = db.session.get(Producto, id_producto)
     if producto is None:
@@ -247,7 +247,7 @@ def listas():
 
 
 @productos_bp.route('/listas/admin', methods=['GET', 'POST'])
-@permiso_requerido('productos.administrar')
+@permiso_requerido('productos.administrar', estricto=True)
 def administrar_listas():
     error = None
     if request.method == 'POST':
@@ -470,7 +470,7 @@ def cotizar_producto():
 
 
 @productos_bp.route('/cotizar-borrador', methods=['POST'])
-@permiso_requerido('productos.administrar')
+@permiso_requerido('productos.administrar', estricto=True)
 def cotizar_borrador():
     datos = request.get_json(silent=True)
     if not isinstance(datos, dict):
@@ -910,7 +910,7 @@ def _procesar_formulario(producto=None):
 
 
 @productos_bp.route('/<int:id_producto>/ruta')
-@permiso_requerido('productos.administrar')
+@permiso_requerido('productos.administrar', estricto=True)
 def ruta_guardada(id_producto):
     """Ruta de un producto, para copiarla en el editor (solo procesos activos)."""
     producto = db.session.get(Producto, id_producto)
@@ -933,7 +933,7 @@ def ruta_guardada(id_producto):
 
 
 @productos_bp.route('/<int:id_producto>/aplicar-ruta', methods=['GET', 'POST'])
-@permiso_requerido('productos.administrar')
+@permiso_requerido('productos.administrar', estricto=True)
 def aplicar_ruta_categoria(id_producto):
     """GET: conteos de la categoría. POST {modo}: copia la ruta guardada a la categoría."""
     producto = db.session.get(Producto, id_producto)
@@ -970,7 +970,7 @@ def aplicar_ruta_categoria(id_producto):
 
 
 @productos_bp.route('/nuevo', methods=['GET', 'POST'])
-@permiso_requerido('productos.administrar')
+@permiso_requerido('productos.administrar', estricto=True)
 def nuevo():
     if request.method == 'POST':
         return _procesar_formulario()
@@ -978,11 +978,11 @@ def nuevo():
 
 
 @productos_bp.route('/<int:id_producto>/editar', methods=['GET', 'POST'])
-@permiso_requerido('productos.administrar')
+@permiso_requerido('productos.administrar', estricto=True)
 def editar(id_producto):
     producto = db.session.get(Producto, id_producto)
     if producto is None:
-        return jsonify({'error': 'El producto no existe.'}), 404
+        abort(404)   # es una página: el navegador no debe mostrar JSON crudo
     if request.method == 'POST':
         return _procesar_formulario(producto)
     return render_template('productos/form.html', **_contexto_formulario(producto))

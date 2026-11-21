@@ -2,7 +2,7 @@ import os
 from datetime import timedelta
 from dotenv import load_dotenv
 
-from flask import Flask, redirect, url_for
+from flask import Flask, jsonify, redirect, render_template, request, url_for
 from sqlalchemy import text
 
 from config import db
@@ -43,6 +43,11 @@ secret_key = os.environ.get('SECRET_KEY')
 database_url = os.environ.get('DATABASE_URL')
 if not secret_key:
     raise RuntimeError('Define la variable de entorno SECRET_KEY antes de iniciar la aplicación.')
+if len(secret_key) < 32:
+    raise RuntimeError(
+        'SECRET_KEY debe tener al menos 32 caracteres. '
+        'Genera una con: python -c "import secrets; print(secrets.token_urlsafe(48))"'
+    )
 if not database_url:
     raise RuntimeError('Define la variable de entorno DATABASE_URL antes de iniciar la aplicación.')
 
@@ -74,6 +79,10 @@ app.config.update(
     # Carpeta que vigila SignCut; vacía desactiva el envío directo.
     CARPETA_SIGNCUT=os.environ.get('CARPETA_SIGNCUT', ''),
     PERMANENT_SESSION_LIFETIME=timedelta(days=int(os.environ.get('SESION_DIAS', '30'))),
+    # Cookie de sesión: explícita para no depender de los valores por defecto del navegador.
+    # Lax (no Strict) para que el QR de la etiqueta, que abre la ficha desde fuera, conserve la sesión.
+    SESSION_COOKIE_SAMESITE='Lax',
+    SESSION_COOKIE_HTTPONLY=True,
 )
 
 load_dotenv()
@@ -137,6 +146,16 @@ with app.app_context():
         print(f"Error al conectar con la base de datos: {e}")
 
 
+@app.errorhandler(403)
+def _prohibido(_error):
+    mensaje = 'No tienes permiso para ver esta página.'
+    if (request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+            or request.is_json
+            or (request.accept_mimetypes.accept_json and not request.accept_mimetypes.accept_html)):
+        return jsonify({'success': False, 'error': mensaje}), 403
+    return render_template('error_403.html', mensaje=mensaje), 403
+
+
 @app.route('/')
 def index():
     # Si no hay sesión, la guardia de seguridad lo manda al login.
@@ -144,4 +163,6 @@ def index():
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    # Sin modo debug: expondría el depurador de Werkzeug (ejecución de código) en la red local.
+    # Para producción se usa servidor.py (Waitress).
+    app.run()

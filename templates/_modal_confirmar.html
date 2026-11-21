@@ -1,0 +1,47 @@
+<style>
+  /* Por encima de la barra inferior y de los avisos flotantes (el fondo difuminado ya la cubre). */
+  #modalConfirmar { z-index: 1100; }
+  #modalConfirmar .modal-dialog { max-width: 440px; }
+  #modalConfirmar .modal-content { background: #fff; border: 0; border-radius: 28px; padding: 1.5rem; }
+  #modalConfirmar .modal-header,
+  #modalConfirmar .modal-footer { border: 0; padding: 0; }
+  #modalConfirmar .modal-header { margin-bottom: .75rem; }
+  #modalConfirmar .modal-title { align-items: center; display: flex; font-size: 1.25rem; font-weight: 700; gap: .6rem; }
+  #modalConfirmar .pf-confirmar-icono { color: #f59f00; font-size: 1.75rem; line-height: 1; }
+  #modalConfirmar.pf-confirmar-peligro .pf-confirmar-icono { color: #e74c3c; }
+  #modalConfirmar .modal-body { color: #344054; padding: 0; white-space: pre-line; }
+  #modalConfirmar .modal-footer { display: flex; flex-wrap: nowrap; gap: .5rem; justify-content: flex-end; padding-top: 1.25rem; }
+  #modalConfirmar .modal-footer > * { margin: 0; width: auto; }
+  #modalConfirmar .pf-confirmar-boton {
+    align-items: center; border: 0; border-radius: 999px; display: inline-flex; font-weight: 700;
+    height: 44px; justify-content: center; padding: 0 1.5rem; white-space: nowrap;
+  }
+  #modalConfirmar .pf-confirmar-cancelar { background: #eef1f5; color: #344054; }
+  #modalConfirmar .pf-confirmar-cancelar:hover { background: #e1e6ec; }
+  #modalConfirmar .pf-confirmar-aceptar { background: #1d63ed; color: #fff; }
+  #modalConfirmar .pf-confirmar-aceptar:hover { background: #1853c7; }
+  #modalConfirmar.pf-confirmar-peligro .pf-confirmar-aceptar { background: #e74c3c; }
+  #modalConfirmar.pf-confirmar-peligro .pf-confirmar-aceptar:hover { background: #d13f30; }
+  #modalConfirmar button:focus-visible { outline: 2px solid #212529; outline-offset: 2px; }
+  @media (max-width: 575.98px) {
+    #modalConfirmar .modal-dialog { margin-inline: .75rem; }
+    #modalConfirmar .modal-content { padding: 1.1rem; }
+    #modalConfirmar .modal-footer > * { flex: 1; width: auto; }
+  }
+</style>
+
+<!-- MODAL: CONFIRMACIÓN (window.pfConfirmar, static/js/confirmar.js) -->
+<div class="modal fade" id="modalConfirmar" tabindex="-1" aria-labelledby="modalConfirmarTitulo" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content shadow-lg">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalConfirmarTitulo"><i class="bi bi-exclamation-triangle-fill pf-confirmar-icono" aria-hidden="true"></i><span id="confirmarTitulo">Confirmar</span></h5>
+      </div>
+      <div class="modal-body" id="confirmarMensaje"></div>
+      <div class="modal-footer">
+        <button type="button" class="pf-confirmar-boton pf-confirmar-cancelar" id="confirmarCancelar">Cancelar</button>
+        <button type="button" class="pf-confirmar-boton pf-confirmar-aceptar" id="confirmarAceptar">Aceptar</button>
+      </div>
+    </div>
+  </div>
+</div>

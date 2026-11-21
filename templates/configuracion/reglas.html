@@ -26,18 +26,21 @@
     grid-template-columns: 28px minmax(0, 1fr) 48px 40px; min-height: 56px;
   }
   .regla-bloque.inactivo .regla-fila { background: #f7f7f8; color: #8a9096; }
+  .regla-nombre { cursor: pointer; }
   .regla-arrastre { color: #a0a7ae; cursor: grab; text-align: center; touch-action: none; user-select: none; }
   .regla-nombre { min-width: 0; }
   .regla-palabra { font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .regla-categoria { color: #7b8794; font-size: .72rem; }
+  .regla-categoria { color: #7b8794; font-size: .72rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .regla-estado { display: flex; justify-content: center; }
   .regla-estado .form-switch { margin: 0; }
   .regla-estado .form-check-input { cursor: pointer; height: 1.15em; width: 2.25em; }
   .regla-menu { text-align: right; }
-  .regla-menu .btn { align-items: center; border-radius: 50%; color: #667085; display: inline-flex;
+  .regla-menu .btn { text-decoration: none; background: transparent; align-items: center; border-radius: 50%; color: #667085; display: inline-flex;
     font-size: 1.25rem; height: 40px; justify-content: center; line-height: 1; padding: 0; width: 40px; }
+  .regla-menu .btn:hover { background: #eef1f5; color: #344054; }
+  .regla-menu .btn:focus-visible, .regla-menu .btn.show { background: #e4ebf5; color: #1d63ed; outline: 2px solid #1d63ed; outline-offset: 1px; box-shadow: none; }
   .regla-menu .dropdown-toggle.no-caret::after { display: none; }
-  .regla-menu .dropdown-menu { border: 0; border-radius: 14px; box-shadow: 0 10px 24px rgba(23,67,107,.16); }
+  .regla-menu .dropdown-menu { border: 0; border-radius: 14px; box-shadow: 0 10px 24px rgba(23,67,107,.16); z-index: 1080; }
   .regla-panel { background: #fafbfc; border-top: 1px solid #edf0f3; padding: 14px 16px 16px 44px; }
   .regla-panel[hidden] { display: none; }
   .regla-campos { display: grid; gap: .5rem; grid-template-columns: minmax(0,1fr) minmax(0,.7fr) 110px; }
@@ -87,8 +90,7 @@
           <div class="regla-arrastre" aria-label="Arrastrar regla">⋮⋮</div>
           <div class="regla-nombre" title="Editar regla">
             <div class="regla-palabra">{{ regla.palabra_clave }}</div>
-            {% if regla.categoria %}<div class="regla-categoria">{{ regla.categoria }} · prioridad {{ regla.prioridad }}</div>
-            {% else %}<div class="regla-categoria">Sin categoría · prioridad {{ regla.prioridad }}</div>{% endif %}
+            <div class="regla-categoria">{{ regla.categoria or 'Sin categoría' }}</div>
           </div>
           <div class="regla-estado">
             <div class="form-check form-switch">
@@ -98,7 +100,7 @@
           </div>
           <div class="regla-menu">
             <div class="dropdown">
-              <button class="btn btn-link dropdown-toggle no-caret" type="button" data-bs-toggle="dropdown"
+              <button class="btn btn-link dropdown-toggle no-caret" type="button" data-bs-toggle="dropdown" data-bs-auto-close="true"
                       aria-expanded="false" aria-label="Acciones para {{ regla.palabra_clave }}">⋯</button>
               <ul class="dropdown-menu dropdown-menu-end">
                 <li><button type="button" class="dropdown-item regla-editar-menu">Editar</button></li>
@@ -110,10 +112,14 @@
         </div>
         <div class="regla-panel" hidden>
           <div class="regla-campos">
-            <input class="form-control regla-palabra-input" maxlength="120" value="{{ regla.palabra_clave }}" aria-label="Palabra clave">
-            <input class="form-control categoria-campo regla-categoria-input" maxlength="60" value="{{ regla.categoria or '' }}" placeholder="Categoría" aria-label="Categoría">
-            <input class="form-control regla-prioridad-input" type="number" value="{{ regla.prioridad }}" aria-label="Prioridad">
+            <div><label class="form-label small text-muted mb-1">Palabra clave</label>
+              <input class="form-control regla-palabra-input" maxlength="120" value="{{ regla.palabra_clave }}" aria-label="Palabra clave"></div>
+            <div class="categoria-campo"><label class="form-label small text-muted mb-1">Categoría (para agrupar)</label>
+              <input class="form-control regla-categoria-input" maxlength="60" value="{{ regla.categoria or '' }}" placeholder="Sin categoría" aria-label="Categoría"></div>
+            <div><label class="form-label small text-muted mb-1">Prioridad</label>
+              <input class="form-control regla-prioridad-input" type="number" value="{{ regla.prioridad }}" aria-label="Prioridad"></div>
           </div>
+          <div class="small text-muted mt-2 mb-1">Ruta de producción</div>
           <div class="editor-ruta-regla" data-inicial='{{ {"pasos": regla.pasos, "id_proceso_principal": regla.id_proceso_principal}|tojson }}'></div>
           <div class="regla-panel-actions">
             <button type="button" class="btn btn-outline-secondary rounded-pill px-3 regla-cancelar">Cancelar</button>
@@ -130,7 +136,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
+<script src="{{ url_for('static', filename='vendor/sortablejs/Sortable.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/editor_ruta.js') }}"></script>
 <script>
 (() => {
@@ -168,7 +174,7 @@
   async function guardarOrden() {
     const orden = bloques().map(bloque => Number(bloque.dataset.id));
     try { await post({accion:'reordenar', orden}); }
-    catch (error) { alert(error.message); window.location.reload(); }
+    catch (error) { pfAvisar(error.message); setTimeout(() => window.location.reload(), 1500); }
   }
 
   formNueva.addEventListener('submit', async evento => {
@@ -184,7 +190,7 @@
         ruta:{pasos:[], id_proceso_principal:null},
       });
       window.location.reload();
-    } catch (error) { alert(error.message); boton.disabled = false; }
+    } catch (error) { pfAvisar(error.message); boton.disabled = false; }
   });
 
   function inicializarEditor(bloque) {
@@ -214,7 +220,7 @@
       const panel = bloque.querySelector('.regla-panel');
       const editor = inicializarEditor(bloque);
       const errores = editor.validar();
-      if (errores.length) { alert(errores.join('\n')); return; }
+      if (errores.length) { pfAvisar(errores.join(' ')); return; }
       try {
         await post({
           accion:'editar',
@@ -225,7 +231,7 @@
           ruta:editor.obtener(),
         });
         window.location.reload();
-      } catch (error) { alert(error.message); }
+      } catch (error) { pfAvisar(error.message); }
       return;
     }
 
@@ -254,7 +260,7 @@
       const activos = bloques().filter(item => item.dataset.activo === '1');
       const inactivos = bloques().filter(item => item.dataset.activo === '0');
       [...activos, ...inactivos].forEach(item => lista.appendChild(item));
-    } catch (error) { interruptor.checked = !interruptor.checked; alert(error.message); }
+    } catch (error) { interruptor.checked = !interruptor.checked; pfAvisar(error.message); }
   });
 
   const prueba = document.getElementById('descripcionPrueba');
@@ -269,9 +275,15 @@
         const datos = await post({accion:'prueba', descripcion});
         const nombreRuta = datos.ruta.map(paso => paso.nombre + (paso.opcional ? '*' : '')).join(' → ') || 'Sin ruta';
         resultado.hidden = false;
-        resultado.innerHTML = datos.regla
-          ? `<strong>Coincide:</strong> ${datos.regla.palabra_clave} · <strong>Ruta:</strong> ${nombreRuta}`
-          : `<strong>Sin regla.</strong> <strong>Ruta:</strong> ${nombreRuta}`;
+        // Nodos de texto (nunca innerHTML): palabra clave y nombres de proceso son texto libre.
+        const negrita = texto => {
+          const elemento = document.createElement('strong');
+          elemento.textContent = texto;
+          return elemento;
+        };
+        resultado.replaceChildren(...(datos.regla
+          ? [negrita('Coincide:'), ` ${datos.regla.palabra_clave} · `, negrita('Ruta:'), ` ${nombreRuta}`]
+          : [negrita('Sin regla.'), ' ', negrita('Ruta:'), ` ${nombreRuta}`]));
       } catch (error) {
         resultado.hidden = false;
         resultado.textContent = error.message;

@@ -110,9 +110,6 @@ def _url_pedido(pedido):
 
 
 def generar_imagen(pedido):
-    print("========== SE EJECUTÓ generar_imagen() ==========", flush=True)
-    print(f"Folio: {pedido.folio}", flush=True)
-    
     img = Image.new('L', (ANCHO, ALTO), 255)
     d = ImageDraw.Draw(img)
     M = 22                       # margen interior
@@ -247,9 +244,6 @@ def modo_impresion():
 
 
 def imprimir(pedido):
-    print("========== SE EJECUTÓ imprimir() ==========", flush=True)
-    print(f"Folio recibido: {pedido.folio}", flush=True)
-
     img = generar_imagen(pedido)
     modo = modo_impresion()
 

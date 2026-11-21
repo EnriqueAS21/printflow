@@ -390,14 +390,34 @@
 
     // ── Ruta de producción ──────────────────────────────────────────────
     const seccionRuta = document.getElementById('seccionRuta');
-    const rutaGuardadaJson = JSON.stringify(inicial.ruta || { pasos: [], id_proceso_principal: null });
+    // Firma independiente del orden de las claves: el servidor las entrega ordenadas alfabéticamente.
+    const firmaRuta = ruta => {
+        const pasos = ((ruta && ruta.pasos) || []).map(p => `${Number(p.id_proceso)}:${p.opcional === true ? 1 : 0}`).join(',');
+        const principal = ruta && ruta.id_proceso_principal != null && ruta.id_proceso_principal !== '' ? Number(ruta.id_proceso_principal) : '';
+        return `${pasos}|${principal}`;
+    };
+    const rutaGuardadaFirma = firmaRuta(inicial.ruta);
+    // Lee la respuesta como JSON; si no lo es (sesión vencida, error del servidor) da un mensaje claro.
+    async function leerJson(respuesta, mensajeError) {
+        const tipo = respuesta.headers.get('content-type') || '';
+        if (!tipo.includes('application/json')) {
+            throw new Error(respuesta.ok
+                ? 'El servidor respondió con un formato inesperado. Recarga la página e inténtalo de nuevo.'
+                : `${mensajeError} (HTTP ${respuesta.status}).`);
+        }
+        let cuerpo;
+        try { cuerpo = await respuesta.json(); }
+        catch { throw new Error('La respuesta del servidor no es válida.'); }
+        if (!respuesta.ok) throw new Error(cuerpo.error || `${mensajeError} (HTTP ${respuesta.status}).`);
+        return cuerpo;
+    }
     const botonAplicar = document.getElementById('aplicarRutaCategoria');
     const estadoAplicar = document.getElementById('aplicarRutaEstado');
     const cabecerasAjax = { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
 
     function actualizarAplicar() {
         if (!botonAplicar) return;
-        const cambiada = JSON.stringify(editorRuta.obtener()) !== rutaGuardadaJson;
+        const cambiada = firmaRuta(editorRuta.obtener()) !== rutaGuardadaFirma;
         botonAplicar.disabled = cambiada;
         estadoAplicar.textContent = cambiada ? 'Hay cambios en la ruta sin guardar: guarda el producto para aplicarla.' : '';
         estadoAplicar.className = 'small mt-2 text-muted';
@@ -423,15 +443,14 @@
         if (q.length < 2) { resultadosCopia.classList.add('d-none'); return; }
         try {
             const respuesta = await fetch(`${seccionRuta.dataset.urlBuscar}?q=${encodeURIComponent(q)}`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
-            if (!respuesta.ok) throw new Error();
-            const productos = (await respuesta.json()).filter(p => String(p.id_producto) !== (seccionRuta.dataset.idProducto || ''));
+            const productos = (await leerJson(respuesta, 'No se pudo buscar productos')).filter(p => String(p.id_producto) !== (seccionRuta.dataset.idProducto || ''));
             if (id !== consultaCopia) return;
             resultadosCopia.innerHTML = productos.length
                 ? productos.map(p => `<button type="button" class="list-group-item list-group-item-action" data-id="${escapar(p.id_producto)}">${escapar(p.clave)} · ${escapar(p.nombre)}</button>`).join('')
                 : '<div class="list-group-item text-muted small">Sin resultados</div>';
             resultadosCopia.classList.remove('d-none');
-        } catch {
-            estadoCopia.textContent = 'No se pudo buscar productos.';
+        } catch (error) {
+            estadoCopia.textContent = error.message || 'No se pudo buscar productos.';
         }
     }
     buscarCopia.addEventListener('input', () => {
@@ -446,8 +465,7 @@
         try {
             const url = seccionRuta.dataset.urlRuta.replace(/\/0\/ruta$/, `/${boton.dataset.id}/ruta`);
             const respuesta = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
-            const datos = await respuesta.json();
-            if (!respuesta.ok) throw new Error(datos.error || 'No se pudo copiar la ruta.');
+            const datos = await leerJson(respuesta, 'No se pudo copiar la ruta');
             editorRuta.establecer(datos);
             actualizarAplicar();
             buscarCopia.value = '';
@@ -461,27 +479,32 @@
     if (botonAplicar) {
         botonAplicar.addEventListener('click', async () => {
             const modo = document.querySelector('input[name="modoAplicar"]:checked').value;
-            const mostrar = (texto, error) => { estadoAplicar.textContent = texto; estadoAplicar.className = `small mt-2 ${error ? 'text-danger' : 'text-success'}`; };
+            const mostrar = (texto, tipo) => { estadoAplicar.textContent = texto; estadoAplicar.className = `small mt-2 ${{ error: 'text-danger', ok: 'text-success', info: 'text-muted' }[tipo] || 'text-muted'}`; };
             botonAplicar.disabled = true;
+            estadoAplicar.textContent = '';
             try {
                 const resConteo = await fetch(seccionRuta.dataset.urlAplicar, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
-                const conteo = await resConteo.json();
-                if (!resConteo.ok) throw new Error(conteo.error || 'No se pudo calcular el conteo.');
+                const conteo = await leerJson(resConteo, 'No se pudo calcular el conteo');
                 const destino = modo === 'sin_ruta' ? conteo.sin_ruta : conteo.total;
                 const resumen = `${conteo.sin_ruta} sin ruta · ${conteo.total} en total`;
-                if (!destino) { mostrar(`No hay productos que actualizar en «${conteo.categoria}» (${resumen}).`, true); return; }
+                if (!destino) { mostrar(`No hay productos que actualizar en «${conteo.categoria}» (${resumen}).`, 'info'); return; }
                 const texto = modo === 'sin_ruta'
                     ? `Se copiará la ruta a ${destino} producto(s) sin ruta de «${conteo.categoria}» (${resumen}).`
                     : `Se SOBRESCRIBIRÁ la ruta de ${destino} producto(s) de «${conteo.categoria}» (${resumen}).`;
-                if (!window.confirm(`${texto}\n\n¿Continuar?`)) return;
+                const confirmado = await pfConfirmar({
+                    titulo: modo === 'sin_ruta' ? 'Aplicar ruta a la categoría' : 'Sobrescribir rutas de la categoría',
+                    mensaje: texto,
+                    aceptar: modo === 'sin_ruta' ? 'Aplicar' : 'Sobrescribir',
+                    peligro: modo !== 'sin_ruta',
+                });
+                if (!confirmado) return;
                 const respuesta = await fetch(seccionRuta.dataset.urlAplicar, { method: 'POST', headers: cabecerasAjax, body: JSON.stringify({ modo }) });
-                const resultado = await respuesta.json();
-                if (!respuesta.ok) throw new Error(resultado.error || 'No se pudo aplicar la ruta.');
-                mostrar(`Ruta aplicada a ${resultado.aplicados} producto(s) de «${resultado.categoria}».`, false);
+                const resultado = await leerJson(respuesta, 'No se pudo aplicar la ruta');
+                mostrar(`Ruta aplicada a ${resultado.aplicados} producto(s) de «${resultado.categoria}».`, 'ok');
             } catch (error) {
-                mostrar(error.message, true);
+                mostrar(error.message, 'error');
             } finally {
-                botonAplicar.disabled = JSON.stringify(editorRuta.obtener()) !== rutaGuardadaJson;
+                botonAplicar.disabled = firmaRuta(editorRuta.obtener()) !== rutaGuardadaFirma;
             }
         });
     }

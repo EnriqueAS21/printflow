@@ -115,6 +115,7 @@
     border: 0;
     border-radius: 14px;
     box-shadow: 0 10px 24px rgba(23, 67, 107, .16);
+    z-index: 1080;
   }
   .proceso-menu .dropdown-toggle.no-caret::after { display: none; }
   .proceso-menu .dropdown-item { border-radius: 8px; }
@@ -180,7 +181,7 @@
         <div class="proceso-menu">
           {% if not sistema %}
           <div class="dropdown">
-            <button class="btn btn-link dropdown-toggle no-caret" type="button" data-bs-toggle="dropdown"
+            <button class="btn btn-link dropdown-toggle no-caret" type="button" data-bs-toggle="dropdown" data-bs-auto-close="true"
                     aria-expanded="false" aria-label="Acciones para {{ proceso.nombre }}">⋯</button>
             <ul class="dropdown-menu dropdown-menu-end">
               <li><button type="button" class="dropdown-item proceso-editar-menu">Editar</button></li>
@@ -200,7 +201,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
+<script src="{{ url_for('static', filename='vendor/sortablejs/Sortable.min.js') }}"></script>
 <script>
 (() => {
   const lista = document.getElementById('listaProcesos');
@@ -263,7 +264,7 @@
     normalizarGrupos();
     const orden = [...filasEditables(), sistemaFila()].filter(Boolean).map(fila => Number(fila.dataset.id));
     try { await post({ accion: 'reordenar', orden }); }
-    catch (error) { alert(error.message); window.location.reload(); }
+    catch (error) { pfAvisar(error.message); setTimeout(() => window.location.reload(), 1500); }
   }
 
   formNuevo.addEventListener('submit', async evento => {
@@ -274,7 +275,7 @@
       await post({ accion: 'crear', nombre: formNuevo.elements.nombre.value });
       window.location.reload();
     } catch (error) {
-      alert(error.message);
+      pfAvisar(error.message);
       boton.disabled = false;
     }
   });
@@ -334,10 +335,18 @@
       const fila = input.closest('.proceso-fila');
       try {
         const resultado = await post({ accion: 'editar', id_proceso: Number(fila.dataset.id), nombre: input.value });
+        // El servidor normaliza el nombre (p. ej. mayúsculas): ese es el valor vigente.
+        // Si no se actualiza `original`, cancelarEdicion restaura el nombre viejo en el input
+        // y un Enter posterior lo guardaría de vuelta.
+        input.value = input.dataset.original = resultado.nombre;
         fila.querySelector('.nombre-texto').textContent = resultado.nombre;
+        const interruptor = fila.querySelector('.proceso-switch');
+        if (interruptor) interruptor.setAttribute('aria-label', `Activar o desactivar ${resultado.nombre}`);
+        const menu = fila.querySelector('.dropdown-toggle');
+        if (menu) menu.setAttribute('aria-label', `Acciones para ${resultado.nombre}`);
         cancelarEdicion(input);
       } catch (error) {
-        alert(error.message);
+        pfAvisar(error.message);
         input.focus();
       }
     }
@@ -366,7 +375,7 @@
       conteo.textContent = String(filasEditables().length);
     } catch (error) {
       interruptor.checked = !interruptor.checked;
-      alert(error.message);
+      pfAvisar(error.message);
     }
   });
 

@@ -145,24 +145,28 @@ def es_responsable(pedido, usuario):
     )
 
 
-def denegar(mensaje='No tienes permiso para realizar esta acción.'):
+def denegar(mensaje='No tienes permiso para realizar esta acción.', estricto=False):
+    """AJAX: 403 con JSON. Navegador: aviso y vuelta al tablero; con estricto=True, 403 real."""
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return jsonify({'success': False, 'error': mensaje}), 403
+    if estricto:
+        abort(403)
     flash(mensaje, 'danger')
     if request.endpoint == 'dashboard.index':
         abort(403)
     return redirect(url_for('dashboard.index'))
 
 
-def permiso_requerido(*permisos):
-    """Pasa si el usuario tiene AL MENOS uno de los permisos."""
+def permiso_requerido(*permisos, estricto=False):
+    """Pasa si el usuario tiene AL MENOS uno de los permisos.
+    estricto=True: sin permiso responde 403 (página o JSON), en vez de redirigir al tablero."""
     def decorator(f):
         @wraps(f)
         def wrapper(*args, **kwargs):
             if not any(tiene_permiso(p) for p in permisos):
                 registrar('ACCESO_DENEGADO', detalle=f'{request.method} {request.path}')
                 db.session.commit()
-                return denegar()
+                return denegar(estricto=estricto)
             return f(*args, **kwargs)
         return wrapper
     return decorator

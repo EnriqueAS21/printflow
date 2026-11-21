@@ -56,7 +56,7 @@
                 <label class="er-opcional"><input class="form-check-input er-opcional-check" type="checkbox" ${opcional ? 'checked' : ''}> Opcional</label>
                 <div class="er-menu">
                     <div class="dropdown">
-                        <button class="btn btn-link dropdown-toggle no-caret" type="button" data-bs-toggle="dropdown"
+                        <button class="btn btn-link dropdown-toggle no-caret" type="button" data-bs-toggle="dropdown" data-bs-auto-close="true"
                                 aria-expanded="false" aria-label="Acciones para ${escapar(nombreDe(id))}">⋯</button>
                         <ul class="dropdown-menu dropdown-menu-end">
                             <li><button type="button" class="dropdown-item er-subir">Subir</button></li>
