@@ -7,6 +7,7 @@ import threading
 import time
 from functools import wraps
 from typing import NamedTuple
+from urllib.parse import urlsplit
 
 import click
 from flask import abort, flash, g, jsonify, redirect, request, session, url_for
@@ -145,10 +146,58 @@ def es_responsable(pedido, usuario):
     )
 
 
+def _pide_json():
+    """¿El cliente es código (fetch/XHR) y espera JSON, no una página?
+
+    Un solo criterio para 401, 403 y módulos apagados. Además de la cabecera X-Requested-With y de los
+    cuerpos JSON, cuenta `Sec-Fetch-Mode` (lo manda el navegador en todo fetch, aunque el JS no ponga cabeceras:
+    "navigate" es navegar; "cors"/"same-origin" es fetch) y un Accept que pide JSON y no HTML.
+    """
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json:
+        return True
+    if request.headers.get('Sec-Fetch-Mode') in ('cors', 'same-origin'):
+        return True
+    return request.accept_mimetypes.accept_json and not request.accept_mimetypes.accept_html
+
+
+def es_destino_interno(destino):
+    """¿Es una ruta de ESTA app? Empieza con "/", sin "//", sin "\\" (los navegadores la leen como "/"),
+    sin caracteres de control ni esquema/host."""
+    if not destino or not destino.startswith('/') or destino.startswith('//'):
+        return False
+    if '\\' in destino or any(ord(c) < 32 or ord(c) == 127 for c in destino):
+        return False
+    partes = urlsplit(destino)
+    return not partes.scheme and not partes.netloc
+
+
+def _pagina_de_origen():
+    """Ruta (con query) de la página que hizo la petición, según Referer; None si no es de esta app."""
+    partes = urlsplit(request.referrer or '')
+    if partes.netloc and partes.netloc != request.host:
+        return None
+    destino = partes.path + (f'?{partes.query}' if partes.query else '')
+    return destino if es_destino_interno(destino) else None
+
+
+def _sesion_vencida():
+    """Sin sesión válida: JSON 401 para código, redirección al login para quien navega."""
+    if _pide_json():
+        # Para un fetch, la página a la que volver es la que está abierta (Referer), no la URL del fetch.
+        destino = url_for('autenticacion.login', next=_pagina_de_origen())
+        return jsonify({
+            'ok': False, 'success': False, 'codigo': 'sesion_vencida',
+            'error': 'Tu sesión venció. Inicia sesión de nuevo.', 'login': destino,
+        }), 401
+    flash('Inicia sesión para continuar.', 'warning')
+    siguiente = request.full_path.rstrip('?') if request.method == 'GET' else None
+    return redirect(url_for('autenticacion.login', next=siguiente if es_destino_interno(siguiente) else None))
+
+
 def denegar(mensaje='No tienes permiso para realizar esta acción.', estricto=False):
     """AJAX: 403 con JSON. Navegador: aviso y vuelta al tablero; con estricto=True, 403 real."""
-    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        return jsonify({'success': False, 'error': mensaje}), 403
+    if _pide_json():
+        return jsonify({'success': False, 'ok': False, 'error': mensaje, 'codigo': 'sin_permiso'}), 403
     if estricto:
         abort(403)
     flash(mensaje, 'danger')
@@ -183,12 +232,7 @@ def registrar_seguridad(app):
     def _bloquear_modulo_desactivado():
         if request.blueprint is None or modulo_activo(request.blueprint):
             return None
-        pide_json = (
-            request.headers.get('X-Requested-With') == 'XMLHttpRequest'
-            or request.is_json
-            or (request.accept_mimetypes.accept_json and not request.accept_mimetypes.accept_html)
-        )
-        if pide_json:
+        if _pide_json():
             return jsonify({'error': 'Módulo no disponible'}), 404
         abort(404)
 
@@ -201,11 +245,8 @@ def registrar_seguridad(app):
         usuario = cargar_usuario_actual(uid) if uid else None
         if usuario is None or not usuario.activo:
             session.clear()
-            flash('Inicia sesión para continuar.', 'warning')
-            siguiente = request.path if request.method == 'GET' else None
-            return redirect(url_for('autenticacion.login', next=siguiente))
-        g.usuario = usuario
-        session['usuario_rol'] = usuario.rol  # compatibilidad con código anterior
+            return _sesion_vencida()
+        g.usuario = usuario   # la sesión no se escribe aquí: así los polls no mandan Set-Cookie
         return None
 
     @app.context_processor

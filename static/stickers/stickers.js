@@ -200,6 +200,11 @@
         }
         const respuesta = await fetch(API + ruta, op);
         if (!respuesta.ok) throw await errorDe(respuesta);
+        // Esta API responde JSON o archivos; un HTML es otra cosa (p. ej. la página de login) y no debe
+        // descargarse como si fuera el archivo exportado.
+        if ((respuesta.headers.get('Content-Type') || '').includes('text/html')) {
+            throw new Error('Respuesta inesperada del servidor. Recarga la página.');
+        }
         return respuesta;
     }
 

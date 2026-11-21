@@ -766,8 +766,8 @@
           headers: { 'X-Requested-With': 'XMLHttpRequest' },
           signal: controlador.signal,
         });
-        if (respuesta.redirected) {   // sesión vencida: la guardia manda al login
-          location.href = respuesta.url;
+        if (respuesta.redirected) {   // sesión vencida (el envoltorio de base.html normalmente lo atrapa antes)
+          location.reload();          // la guardia manda al login y, al volver, a esta misma página
           return;
         }
         if (!respuesta.ok) {

@@ -98,8 +98,8 @@
                 headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                 body: JSON.stringify({ listas }),
             });
-            if (respuesta.redirected) {
-                window.location.assign(respuesta.url);
+            if (respuesta.redirected) {   // sesión vencida: al recargar, la guardia manda al login y regresa aquí
+                window.location.reload();
                 return;
             }
             const cuerpoRespuesta = await respuesta.json();

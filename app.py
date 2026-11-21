@@ -20,7 +20,7 @@ from rutas.pedidos import pedidos_bp
 from rutas.productos import productos_bp
 from rutas.usuarios import bitacora_bp, usuarios_bp
 from servicios.compresion import configurar_compresion
-from servicios.permisos import registrar_seguridad
+from servicios.permisos import _pide_json, registrar_seguridad
 from rutas.reportes import reportes_bp
 from rutas.stickers import stickers_bp
 from servicios.textos import enlazar
@@ -149,10 +149,8 @@ with app.app_context():
 @app.errorhandler(403)
 def _prohibido(_error):
     mensaje = 'No tienes permiso para ver esta página.'
-    if (request.headers.get('X-Requested-With') == 'XMLHttpRequest'
-            or request.is_json
-            or (request.accept_mimetypes.accept_json and not request.accept_mimetypes.accept_html)):
-        return jsonify({'success': False, 'error': mensaje}), 403
+    if _pide_json():
+        return jsonify({'success': False, 'ok': False, 'error': mensaje, 'codigo': 'sin_permiso'}), 403
     return render_template('error_403.html', mensaje=mensaje), 403
 
 

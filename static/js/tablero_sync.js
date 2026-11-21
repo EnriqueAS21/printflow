@@ -587,6 +587,10 @@
         location.reload();
         return;
       }
+      if (respuesta.status === 403) {   // sin permiso: reintentar no sirve; el envoltorio de base.html ya avisó
+        detenido = true;
+        return;
+      }
       if (!respuesta.ok) throw new Error(`HTTP ${respuesta.status}`);
       const datos = await respuesta.json();
       if (datos.recargar) {

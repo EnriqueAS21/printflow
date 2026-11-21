@@ -240,6 +240,65 @@
     </style>
     {% block styles %}{% endblock %}
     <script>
+    // Envoltorio global de fetch/XHR (va antes que cualquier otro script de la página).
+    //  · 401 (sesión vencida) → al login, con next = la página abierta (no la URL del fetch). La promesa se queda
+    //    pendiente: quien llamó no llega a mostrar "Unexpected token <" ni a leer el HTML del login.
+    //  · Un 302 al login que el fetch siguió solo (servidor viejo, o fetch sin cabeceras) se trata igual.
+    //  · 403 → aviso del sistema (una vez cada 8 s por mensaje, para que un poll no lo repita).
+    // Solo peticiones al mismo origen.
+    (function () {
+        var LOGIN = "{{ url_for('autenticacion.login') }}";
+        var yendo = false, avisos = {};
+        function mismoOrigen(url) {
+            try { return new URL(url, location.href).origin === location.origin; } catch (e) { return false; }
+        }
+        function irAlLogin() {
+            if (yendo || location.pathname === LOGIN) return;
+            yendo = true;
+            location.assign(LOGIN + '?next=' + encodeURIComponent(location.pathname + location.search));
+        }
+        function avisar(mensaje) {
+            var ahora = Date.now();
+            if (avisos[mensaje] && ahora - avisos[mensaje] < 8000) return;
+            avisos[mensaje] = ahora;
+            if (window.pfAvisar) window.pfAvisar(mensaje);
+        }
+        var SIN_PERMISO = 'No tienes permiso para realizar esta acción.';
+        window.pfIrAlLogin = irAlLogin;
+
+        var original = window.fetch.bind(window);
+        window.fetch = function (entrada, opciones) {
+            var url = typeof entrada === 'string' ? entrada : (entrada && entrada.url) || String(entrada);
+            return original(entrada, opciones).then(function (resp) {
+                if (!mismoOrigen(url) || location.pathname === LOGIN) return resp;
+                var haciaLogin = resp.redirected && new URL(resp.url).pathname === LOGIN;
+                if (resp.status === 401 || haciaLogin) {
+                    irAlLogin();
+                    return new Promise(function () {});
+                }
+                if (resp.status === 403) {
+                    resp.clone().json().then(
+                        function (d) { avisar((d && d.error) || SIN_PERMISO); },
+                        function () { avisar(SIN_PERMISO); });
+                }
+                return resp;
+            });
+        };
+
+        var abrir = XMLHttpRequest.prototype.open;
+        XMLHttpRequest.prototype.open = function (metodo, url) {
+            var xhr = this;
+            if (mismoOrigen(url)) {
+                xhr.addEventListener('load', function () {
+                    if (xhr.status === 401) irAlLogin();
+                    else if (xhr.status === 403) avisar(SIN_PERMISO);
+                });
+            }
+            return abrir.apply(xhr, arguments);
+        };
+    })();
+    </script>
+    <script>
     // pfModo: un único interruptor para navegación (barra superior ↔ inferior) y tablero (columnas ↔ pestañas).
     // Se evalúa aquí, antes del primer pintado, para que no haya parpadeo. window.PF_COLUMNAS_VISIBLES lo fija la página
     // (el tablero); sin él solo cuenta el ancho de la navegación.
@@ -704,8 +763,8 @@
                     method: 'POST', body: new FormData(form),
                     headers: { 'X-Requested-With': 'XMLHttpRequest' },
                 });
-                const datos = await resp.json();
-                if (!datos.success) throw new Error(datos.error);
+                const datos = await resp.json().catch(() => null);   // un 401 ya mandó al login (envoltorio)
+                if (!datos || !datos.success) throw new Error((datos && datos.error) || 'No se pudieron guardar los datos del cliente.');
                 bootstrap.Modal.getOrCreateInstance(modal).hide();
             } catch (err) {
                 alert(err.message || 'No se pudieron guardar los datos del cliente.');
