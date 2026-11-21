@@ -1,0 +1,287 @@
+{% extends 'base.html' %}
+{% block title %}Reglas de clasificación{% endblock %}
+
+{% block styles %}
+{% include 'clientes/_estilos.html' %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/editor_ruta.css') }}">
+<style>
+  body[data-blueprint="configuracion"] main.py-4 { padding-top: 0 !important; padding-bottom: 0 !important; }
+  .reglas-pantalla { max-width: 860px; }
+  .reglas-pantalla > * { min-width: 0; }
+  .prueba-regla { background: #fff; border: 0; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,.05); margin-bottom: 12px; padding: 14px 16px; }
+  .prueba-regla .form-control { border-radius: 999px; background: #f2f2f2; }
+  .prueba-resultado { border-top: 1px solid #edf0f3; margin-top: 10px; padding-top: 10px; }
+
+  .nueva-regla { display: flex; gap: .5rem; margin-bottom: 12px; }
+  .nueva-regla .form-control { min-width: 0; border-radius: 999px; background: #f2f2f2; }
+  .nueva-regla .btn { border-radius: 50%; flex: 0 0 44px; height: 44px; padding: 0; }
+
+  .reglas-lista { margin: 0; padding: 0; overflow: hidden; }
+  .reglas-lista.pantalla-fija__lista { display: flex; flex-direction: column; }
+  #listaReglas { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+  .regla-bloque { border-bottom: 1px solid #edf0f3; }
+  .regla-bloque:last-child { border-bottom: 0; }
+  .regla-fila {
+    align-items: center; background: #fff; display: grid; gap: .35rem;
+    grid-template-columns: 28px minmax(0, 1fr) 48px 40px; min-height: 56px;
+  }
+  .regla-bloque.inactivo .regla-fila { background: #f7f7f8; color: #8a9096; }
+  .regla-arrastre { color: #a0a7ae; cursor: grab; text-align: center; touch-action: none; user-select: none; }
+  .regla-nombre { min-width: 0; }
+  .regla-palabra { font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .regla-categoria { color: #7b8794; font-size: .72rem; }
+  .regla-estado { display: flex; justify-content: center; }
+  .regla-estado .form-switch { margin: 0; }
+  .regla-estado .form-check-input { cursor: pointer; height: 1.15em; width: 2.25em; }
+  .regla-menu { text-align: right; }
+  .regla-menu .btn { align-items: center; border-radius: 50%; color: #667085; display: inline-flex;
+    font-size: 1.25rem; height: 40px; justify-content: center; line-height: 1; padding: 0; width: 40px; }
+  .regla-menu .dropdown-toggle.no-caret::after { display: none; }
+  .regla-menu .dropdown-menu { border: 0; border-radius: 14px; box-shadow: 0 10px 24px rgba(23,67,107,.16); }
+  .regla-panel { background: #fafbfc; border-top: 1px solid #edf0f3; padding: 14px 16px 16px 44px; }
+  .regla-panel[hidden] { display: none; }
+  .regla-campos { display: grid; gap: .5rem; grid-template-columns: minmax(0,1fr) minmax(0,.7fr) 110px; }
+  .regla-campos .form-control { border-radius: 999px; background: #f2f2f2; }
+  .regla-panel-actions { display: flex; justify-content: flex-end; gap: .5rem; margin-top: 12px; }
+  .regla-bloque.sortable-ghost { opacity: .35; background: #eef4ff; }
+  @media (max-width: 575.98px) {
+    .nueva-regla { display: grid; grid-template-columns: minmax(0,1fr) 44px; }
+    .regla-campos { grid-template-columns: minmax(0,1fr) 110px; }
+    .regla-campos .categoria-campo { grid-column: 1 / -1; }
+    .regla-panel { padding-left: 16px; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container pantalla-fija reglas-pantalla pf-pagina-gutter mt-0 mb-0 pf-form">
+  <div class="pantalla-fija__cabecera">
+    <div class="encabezado-pagina">
+      <span class="encabezado-pagina__icono" aria-hidden="true"><i class="bi bi-funnel"></i></span>
+      <div class="encabezado-pagina__texto">
+        <h1 class="encabezado-pagina__titulo">Reglas de clasificación</h1>
+        <p class="encabezado-pagina__subtitulo"><span id="conteoReglas">{{ reglas|length }}</span> reglas · arrastra ⋮⋮ para cambiar prioridad</p>
+      </div>
+    </div>
+
+    <div class="prueba-regla">
+      <label class="form-label small text-muted mb-1" for="descripcionPrueba">Probar descripción</label>
+      <input id="descripcionPrueba" class="form-control" placeholder="Ej. 50 STICKERS VINIL" autocomplete="off">
+      <div id="resultadoPrueba" class="prueba-resultado small text-muted" hidden></div>
+    </div>
+
+    <form id="formNuevaRegla" class="nueva-regla">
+      <input type="hidden" name="accion" value="crear">
+      <input type="hidden" name="token_envio" value="{{ token_envio() }}">
+      <input class="form-control" name="palabra_clave" maxlength="120" placeholder="Nueva palabra clave" required>
+      <button type="submit" class="btn btn-primary" title="Agregar regla" aria-label="Agregar regla">+</button>
+    </form>
+  </div>
+
+  <div class="form-card pantalla-fija__lista reglas-lista">
+    <div id="listaReglas" role="list">
+      {% for regla in reglas %}
+      <div class="regla-bloque {% if not regla.activo %}inactivo{% endif %}"
+           data-id="{{ regla.id_regla }}" data-activo="{{ '1' if regla.activo else '0' }}" role="listitem">
+        <div class="regla-fila">
+          <div class="regla-arrastre" aria-label="Arrastrar regla">⋮⋮</div>
+          <div class="regla-nombre" title="Editar regla">
+            <div class="regla-palabra">{{ regla.palabra_clave }}</div>
+            {% if regla.categoria %}<div class="regla-categoria">{{ regla.categoria }} · prioridad {{ regla.prioridad }}</div>
+            {% else %}<div class="regla-categoria">Sin categoría · prioridad {{ regla.prioridad }}</div>{% endif %}
+          </div>
+          <div class="regla-estado">
+            <div class="form-check form-switch">
+              <input class="form-check-input regla-switch" type="checkbox" role="switch"
+                     aria-label="Activar o desactivar {{ regla.palabra_clave }}" {% if regla.activo %}checked{% endif %}>
+            </div>
+          </div>
+          <div class="regla-menu">
+            <div class="dropdown">
+              <button class="btn btn-link dropdown-toggle no-caret" type="button" data-bs-toggle="dropdown"
+                      aria-expanded="false" aria-label="Acciones para {{ regla.palabra_clave }}">⋯</button>
+              <ul class="dropdown-menu dropdown-menu-end">
+                <li><button type="button" class="dropdown-item regla-editar-menu">Editar</button></li>
+                <li><button type="button" class="dropdown-item regla-subir">Subir</button></li>
+                <li><button type="button" class="dropdown-item regla-bajar">Bajar</button></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        <div class="regla-panel" hidden>
+          <div class="regla-campos">
+            <input class="form-control regla-palabra-input" maxlength="120" value="{{ regla.palabra_clave }}" aria-label="Palabra clave">
+            <input class="form-control categoria-campo regla-categoria-input" maxlength="60" value="{{ regla.categoria or '' }}" placeholder="Categoría" aria-label="Categoría">
+            <input class="form-control regla-prioridad-input" type="number" value="{{ regla.prioridad }}" aria-label="Prioridad">
+          </div>
+          <div class="editor-ruta-regla" data-inicial='{{ {"pasos": regla.pasos, "id_proceso_principal": regla.id_proceso_principal}|tojson }}'></div>
+          <div class="regla-panel-actions">
+            <button type="button" class="btn btn-outline-secondary rounded-pill px-3 regla-cancelar">Cancelar</button>
+            <button type="button" class="btn btn-primary rounded-pill px-3 regla-guardar">Guardar</button>
+          </div>
+        </div>
+      </div>
+      {% else %}
+      <div class="text-center text-muted py-4">No hay reglas configuradas.</div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
+<script src="{{ url_for('static', filename='js/editor_ruta.js') }}"></script>
+<script>
+(() => {
+  const lista = document.getElementById('listaReglas');
+  const formNueva = document.getElementById('formNuevaRegla');
+  const url = {{ url_for('configuracion.reglas')|tojson }};
+  const procesos = {{ procesos|tojson }};
+  const conteo = document.getElementById('conteoReglas');
+
+  function nuevoTokenEnvio() {
+    if (typeof window.crypto?.getRandomValues === 'function') {
+      const bytes = new Uint8Array(16);
+      crypto.getRandomValues(bytes);
+      return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+    }
+    return '{{ token_envio() }}';
+  }
+  async function post(payload) {
+    payload.token_envio = nuevoTokenEnvio();
+    const respuesta = await fetch(url, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
+      body: JSON.stringify(payload),
+    });
+    const contentType = respuesta.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) throw new Error(respuesta.ok ? 'Respuesta inesperada del servidor.' : `Error HTTP ${respuesta.status}.`);
+    let cuerpo;
+    try { cuerpo = await respuesta.json(); } catch (_) { throw new Error('Respuesta JSON inválida.'); }
+    if (!respuesta.ok || cuerpo.ok === false) throw new Error(cuerpo.error || `No se pudo guardar (HTTP ${respuesta.status}).`);
+    if (cuerpo.ok !== true) throw new Error('El servidor no confirmó la operación.');
+    return cuerpo;
+  }
+
+  function bloques() { return [...lista.querySelectorAll('.regla-bloque')]; }
+  async function guardarOrden() {
+    const orden = bloques().map(bloque => Number(bloque.dataset.id));
+    try { await post({accion:'reordenar', orden}); }
+    catch (error) { alert(error.message); window.location.reload(); }
+  }
+
+  formNueva.addEventListener('submit', async evento => {
+    evento.preventDefault();
+    const boton = formNueva.querySelector('button');
+    boton.disabled = true;
+    try {
+      await post({
+        accion:'crear',
+        palabra_clave: formNueva.elements.palabra_clave.value,
+        categoria:'',
+        prioridad: 0,
+        ruta:{pasos:[], id_proceso_principal:null},
+      });
+      window.location.reload();
+    } catch (error) { alert(error.message); boton.disabled = false; }
+  });
+
+  function inicializarEditor(bloque) {
+    const contenedor = bloque.querySelector('.editor-ruta-regla');
+    if (!contenedor || contenedor.editorRuta) return contenedor.editorRuta;
+    const datos = JSON.parse(contenedor.dataset.inicial);
+    contenedor.editorRuta = window.EditorRuta.crear(contenedor, {procesos, datos, maxPasos:8});
+    return contenedor.editorRuta;
+  }
+
+  lista.addEventListener('click', async evento => {
+    const editar = evento.target.closest('.regla-editar-menu');
+    const nombre = evento.target.closest('.regla-nombre');
+    if (editar || nombre) {
+      const bloque = (editar || nombre).closest('.regla-bloque');
+      const panel = bloque.querySelector('.regla-panel');
+      panel.hidden = !panel.hidden;
+      if (!panel.hidden) inicializarEditor(bloque);
+      return;
+    }
+    const cancelar = evento.target.closest('.regla-cancelar');
+    if (cancelar) cancelar.closest('.regla-panel').hidden = true;
+
+    const guardar = evento.target.closest('.regla-guardar');
+    if (guardar) {
+      const bloque = guardar.closest('.regla-bloque');
+      const panel = bloque.querySelector('.regla-panel');
+      const editor = inicializarEditor(bloque);
+      const errores = editor.validar();
+      if (errores.length) { alert(errores.join('\n')); return; }
+      try {
+        await post({
+          accion:'editar',
+          id_regla:Number(bloque.dataset.id),
+          palabra_clave:panel.querySelector('.regla-palabra-input').value,
+          categoria:panel.querySelector('.regla-categoria-input').value,
+          prioridad:Number(panel.querySelector('.regla-prioridad-input').value || 0),
+          ruta:editor.obtener(),
+        });
+        window.location.reload();
+      } catch (error) { alert(error.message); }
+      return;
+    }
+
+    const subir = evento.target.closest('.regla-subir');
+    const bajar = evento.target.closest('.regla-bajar');
+    if (subir || bajar) {
+      const bloque = (subir || bajar).closest('.regla-bloque');
+      const items = bloques();
+      const indice = items.indexOf(bloque);
+      const destino = subir ? indice - 1 : indice + 1;
+      if (destino >= 0 && destino < items.length) {
+        if (subir) items[destino].before(bloque); else items[destino].after(bloque);
+        await guardarOrden();
+      }
+    }
+  });
+
+  lista.addEventListener('change', async evento => {
+    const interruptor = evento.target.closest('.regla-switch');
+    if (!interruptor) return;
+    const bloque = interruptor.closest('.regla-bloque');
+    try {
+      const resultado = await post({accion:'activar', id_regla:Number(bloque.dataset.id)});
+      bloque.dataset.activo = resultado.activo ? '1':'0';
+      bloque.classList.toggle('inactivo', !resultado.activo);
+      const activos = bloques().filter(item => item.dataset.activo === '1');
+      const inactivos = bloques().filter(item => item.dataset.activo === '0');
+      [...activos, ...inactivos].forEach(item => lista.appendChild(item));
+    } catch (error) { interruptor.checked = !interruptor.checked; alert(error.message); }
+  });
+
+  const prueba = document.getElementById('descripcionPrueba');
+  const resultado = document.getElementById('resultadoPrueba');
+  let temporizador;
+  prueba.addEventListener('input', () => {
+    clearTimeout(temporizador);
+    temporizador = setTimeout(async () => {
+      const descripcion = prueba.value.trim();
+      if (!descripcion) { resultado.hidden = true; return; }
+      try {
+        const datos = await post({accion:'prueba', descripcion});
+        const nombreRuta = datos.ruta.map(paso => paso.nombre + (paso.opcional ? '*' : '')).join(' → ') || 'Sin ruta';
+        resultado.hidden = false;
+        resultado.innerHTML = datos.regla
+          ? `<strong>Coincide:</strong> ${datos.regla.palabra_clave} · <strong>Ruta:</strong> ${nombreRuta}`
+          : `<strong>Sin regla.</strong> <strong>Ruta:</strong> ${nombreRuta}`;
+      } catch (error) {
+        resultado.hidden = false;
+        resultado.textContent = error.message;
+      }
+    }, 250);
+  });
+
+  if (window.Sortable) new Sortable(lista, {
+    animation:150, handle:'.regla-arrastre', draggable:'.regla-bloque', onEnd:guardarOrden,
+  });
+})();
+</script>
+{% endblock %}

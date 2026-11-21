@@ -23,7 +23,8 @@ from modelos.produccion import (
 from modelos.envios import MENSAJE_DUPLICADO, reclamar_envio
 from servicios.rutas_produccion import invalidar
 from servicios.permisos import permiso_requerido
-from servicios.textos import normalizar_nombre
+from servicios.textos import normalizar_busqueda, normalizar_nombre
+from servicios.rutas_produccion import ruta_para
 
 configuracion_bp = Blueprint("configuracion", __name__, template_folder="../templates")
 EXTENSIONES_LOGO = {"png", "jpg", "jpeg"}
@@ -316,4 +317,227 @@ def procesos():
         "configuracion/procesos.html",
         procesos=procesos,
         total_procesos=len(normales),
+    )
+
+
+def _validar_ruta_regla(pasos, id_principal):
+    if len(pasos) > 8:
+        raise ValueError("La ruta no puede tener más de 8 pasos.")
+    ids = []
+    for paso in pasos:
+        id_proceso = int(paso.get("id_proceso") or 0)
+        proceso = db.session.get(Proceso, id_proceso)
+        if proceso is None or not bool(proceso.activo) or _es_sin_clasificar(proceso):
+            raise ValueError("La ruta solo puede usar procesos activos.")
+        if ids and ids[-1] == id_proceso:
+            raise ValueError("No repitas el mismo proceso consecutivamente.")
+        ids.append(id_proceso)
+    if id_principal:
+        proceso = db.session.get(Proceso, int(id_principal))
+        if proceso is None or not bool(proceso.activo) or _es_sin_clasificar(proceso):
+            raise ValueError("El proceso principal debe estar activo.")
+
+
+@configuracion_bp.route("/reglas", methods=["GET", "POST"])
+@permiso_requerido("productos.administrar")
+def reglas():
+    if request.method == "POST":
+        datos_json = request.get_json(silent=True)
+        datos = datos_json if isinstance(datos_json, dict) else request.form
+        accion = (datos.get("accion") or "").strip()
+        es_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+        try:
+            if accion == "prueba":
+                descripcion = str(datos.get("descripcion") or "").strip()
+                ruta = ruta_para(None, descripcion)
+                coincidencia = None
+                texto = normalizar_busqueda(descripcion)
+                if texto:
+                    for regla in (
+                        ReglaClasificacion.query
+                        .filter(ReglaClasificacion.activo.is_(True))
+                        .order_by(ReglaClasificacion.prioridad.desc(), ReglaClasificacion.id_regla)
+                        .all()
+                    ):
+                        clave = normalizar_busqueda(regla.palabra_clave)
+                        if clave and clave in texto:
+                            coincidencia = {
+                                "palabra_clave": regla.palabra_clave,
+                                "categoria": regla.categoria,
+                                "prioridad": regla.prioridad,
+                            }
+                            break
+                nombres = {
+                    proceso.id_proceso: proceso.nombre
+                    for proceso in Proceso.query.filter(Proceso.id_proceso.in_([x[1] for x in ruta])).all()
+                } if ruta and all(x[1] is not None for x in ruta) else {}
+                return jsonify(
+                    ok=True,
+                    regla=coincidencia,
+                    ruta=[
+                        {"orden": orden, "id_proceso": id_proceso,
+                         "nombre": nombres.get(id_proceso), "opcional": opcional}
+                        for orden, id_proceso, opcional in ruta
+                    ],
+                )
+
+            if not reclamar_envio(datos.get("token_envio")):
+                return jsonify(ok=False, error=MENSAJE_DUPLICADO), 409
+
+            if accion in ("crear", "editar"):
+                id_regla = int(datos.get("id_regla") or 0)
+                palabra_clave = normalizar_nombre(datos.get("palabra_clave"))
+                if not palabra_clave:
+                    raise ValueError("La palabra clave es obligatoria.")
+                if len(palabra_clave) > 120:
+                    raise ValueError("La palabra clave no puede superar 120 caracteres.")
+                categoria = normalizar_nombre(datos.get("categoria"))
+                if categoria and len(categoria) > 60:
+                    raise ValueError("La categoría no puede superar 60 caracteres.")
+                try:
+                    prioridad = int(datos.get("prioridad") or 0)
+                except (TypeError, ValueError):
+                    raise ValueError("La prioridad debe ser un número entero.")
+
+                duplicado = (
+                    ReglaClasificacion.query
+                    .filter(db.func.lower(ReglaClasificacion.palabra_clave) == palabra_clave.lower())
+                )
+                if accion == "editar":
+                    duplicado = duplicado.filter(ReglaClasificacion.id_regla != id_regla)
+                if duplicado.first() is not None:
+                    raise ValueError("Ya existe una regla con esa palabra clave.")
+
+                if accion == "crear":
+                    regla = ReglaClasificacion(
+                        palabra_clave=palabra_clave,
+                        prioridad=prioridad,
+                        categoria=categoria,
+                        activo=True,
+                    )
+                    db.session.add(regla)
+                    db.session.flush()
+                else:
+                    regla = db.session.get(ReglaClasificacion, id_regla)
+                    if regla is None:
+                        raise ValueError("La regla no existe.")
+
+                ruta_datos = datos.get("ruta") if isinstance(datos, dict) else None
+                if not isinstance(ruta_datos, dict):
+                    raise ValueError("La ruta de la regla no es válida.")
+                pasos = ruta_datos.get("pasos") or []
+                id_principal = ruta_datos.get("id_proceso_principal")
+                _validar_ruta_regla(pasos, id_principal)
+
+                regla.palabra_clave = palabra_clave
+                regla.prioridad = prioridad
+                regla.categoria = categoria
+                regla.id_proceso_principal = int(id_principal) if id_principal else None
+                ReglaPaso.query.filter(ReglaPaso.id_regla == regla.id_regla).delete(
+                    synchronize_session=False
+                )
+                db.session.flush()
+                for orden, paso in enumerate(pasos, start=1):
+                    db.session.add(ReglaPaso(
+                        id_regla=regla.id_regla,
+                        orden=orden,
+                        id_proceso=int(paso["id_proceso"]),
+                        opcional=bool(paso.get("opcional")),
+                    ))
+
+            elif accion == "activar":
+                regla = db.session.get(ReglaClasificacion, int(datos.get("id_regla") or 0))
+                if regla is None:
+                    raise ValueError("La regla no existe.")
+                regla.activo = not bool(regla.activo)
+
+            elif accion == "reordenar":
+                ids = [str(valor) for valor in (datos.get("orden") or [])] if isinstance(datos, dict) else datos.getlist("orden[]")
+                if not ids:
+                    raise ValueError("No hay reglas para ordenar.")
+                lista_por_id = {
+                    fila.id_regla: fila
+                    for fila in ReglaClasificacion.query.filter(
+                        ReglaClasificacion.id_regla.in_([int(valor) for valor in ids])
+                    ).all()
+                }
+                for posicion, valor in enumerate(ids):
+                    fila = lista_por_id.get(int(valor))
+                    if fila is not None:
+                        fila.prioridad = len(ids) - posicion
+
+            else:
+                raise ValueError("Acción no válida.")
+
+            registrar("REGLA_CLASIFICACION_EDITADA", "regla_clasificacion",
+                      getattr(regla if 'regla' in locals() else None, "id_regla", None),
+                      f"{accion}: {getattr(locals().get('regla'), 'palabra_clave', '')}")
+            db.session.commit()
+            invalidar()
+            if es_ajax:
+                respuesta = {"ok": True}
+                if accion == "reordenar":
+                    respuesta["orden"] = [int(valor) for valor in ids]
+                if accion in ("crear", "editar", "activar"):
+                    respuesta.update(
+                        id_regla=regla.id_regla,
+                        palabra_clave=regla.palabra_clave,
+                        categoria=regla.categoria,
+                        prioridad=regla.prioridad,
+                        activo=bool(regla.activo),
+                    )
+                return jsonify(respuesta)
+            return redirect(url_for("configuracion.reglas"))
+        except ValueError as exc:
+            db.session.rollback()
+            if es_ajax:
+                return jsonify(ok=False, error=str(exc)), 400
+            flash(str(exc), "warning")
+        except Exception:
+            db.session.rollback()
+            current_app.logger.exception("Error al guardar reglas de clasificación")
+            if es_ajax:
+                return jsonify(ok=False, error="No se pudo guardar la regla."), 500
+            flash("No se pudo guardar la regla.", "danger")
+        return redirect(url_for("configuracion.reglas"))
+
+    procesos = (
+        Proceso.query
+        .filter(db.func.lower(Proceso.nombre) != "sin clasificar")
+        .order_by(Proceso.orden, Proceso.nombre)
+        .all()
+    )
+    reglas = (
+        ReglaClasificacion.query
+        .order_by(ReglaClasificacion.prioridad.desc(), ReglaClasificacion.palabra_clave)
+        .all()
+    )
+    datos_reglas = []
+    for regla in reglas:
+        pasos = (
+            ReglaPaso.query
+            .filter(ReglaPaso.id_regla == regla.id_regla)
+            .order_by(ReglaPaso.orden)
+            .all()
+        )
+        datos_reglas.append({
+            "id_regla": regla.id_regla,
+            "palabra_clave": regla.palabra_clave,
+            "categoria": regla.categoria,
+            "prioridad": regla.prioridad,
+            "activo": bool(regla.activo),
+            "id_proceso_principal": regla.id_proceso_principal,
+            "pasos": [
+                {"id_proceso": paso.id_proceso, "opcional": bool(paso.opcional)}
+                for paso in pasos
+            ],
+        })
+    return render_template(
+        "configuracion/reglas.html",
+        reglas=datos_reglas,
+        procesos=[
+            {"id_proceso": proceso.id_proceso, "nombre": proceso.nombre,
+             "activo": bool(proceso.activo)}
+            for proceso in procesos
+        ],
     )

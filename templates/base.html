@@ -374,6 +374,7 @@
                             {% endif %}
                             {% if puede('productos.administrar') and modulo_activo('configuracion') %}
                             <li><a class="dropdown-item {% if request.endpoint == 'configuracion.procesos' %}active{% endif %}" href="{{ url_for('configuracion.procesos') }}">Procesos de producción</a></li>
+                            <li><a class="dropdown-item {% if request.endpoint == 'configuracion.reglas' %}active{% endif %}" href="{{ url_for('configuracion.reglas') }}">Reglas de clasificación</a></li>
                             {% endif %}
                             {% if ver_stickers %}
                             <li><a class="dropdown-item {% if request.blueprint == 'stickers' %}active{% endif %}" href="{{ url_for('stickers.index') }}">Stickers</a></li>
@@ -551,6 +552,7 @@
                 {% endif %}
                 {% if puede('productos.administrar') and modulo_activo('configuracion') %}
                 <a class="list-group-item list-group-item-action {% if request.endpoint == 'configuracion.procesos' %}active{% endif %}" href="{{ url_for('configuracion.procesos') }}"><i class="bi bi-diagram-3 me-2"></i>Procesos de producción</a>
+                <a class="list-group-item list-group-item-action {% if request.endpoint == 'configuracion.reglas' %}active{% endif %}" href="{{ url_for('configuracion.reglas') }}"><i class="bi bi-funnel me-2"></i>Reglas de clasificación</a>
                 {% endif %}
                 {% if ver_stickers %}
                 <a class="list-group-item list-group-item-action" href="{{ url_for('stickers.index') }}"><i class="bi bi-emoji-smile me-2"></i>Stickers</a>
