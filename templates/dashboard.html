@@ -7,6 +7,10 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/info_produccion.css') }}">
 {# Columnas visibles al cargar: base.html decide columnas↔pestañas con esto antes del primer pintado. #}
 {% if columnas_produccion %}
+{# Producción: sus tarjetas no llevan datos de pago, así que las columnas pueden ser más angostas (280 px) y 4 caben en 1280 px. #}
+{# Medidas reales de su cuadrícula (minmax(280px) incluye el relleno de la columna, sin separación entre ellas, y el
+   tablero deja 40 px por lado): 4 × 280 + 80 = 1200 px de ancho útil (clientWidth, sin barra de scroll). #}
+<script>window.PF_MIN_COLUMNA = 280; window.PF_GUTTER = 0; window.PF_MARGENES = 80;</script>
 {% set n_cols_visibles = (columnas_produccion|selectattr('pedidos')|list|length) or (columnas_produccion|length) %}
 {% else %}{% set n_cols_visibles = 3 %}{% endif %}
 <script>window.PF_COLUMNAS_VISIBLES = {{ n_cols_visibles }};</script>
@@ -355,7 +359,7 @@
   /* Producción (modo columnas): las columnas sin tarjetas se ocultan y las visibles se reparten el ancho con grid.
      La clase se alterna desde JS (columnasProduccion); la columna sigue en el DOM para que la sincronización inserte en ella.
      Modo pestañas: una columna a la vez (ver más abajo). */
-  html[data-modo="columnas"] .kanban-produccion { display: grid; grid-template-columns: var(--cols, repeat(4, minmax(284px, 1fr))); transition: grid-template-columns .2s ease; overflow-x: auto; }
+  html[data-modo="columnas"] .kanban-produccion { display: grid; grid-template-columns: var(--cols, repeat(4, minmax(280px, 1fr))); transition: grid-template-columns .2s ease; overflow-x: auto; }
   html[data-modo="columnas"] .kanban-produccion > .columna-kanban {
     width: auto; max-width: none; min-width: 0; overflow: hidden;
     transition: opacity .2s ease, padding .2s ease, visibility .2s;
@@ -380,7 +384,6 @@
   .kanban-tab-conteo { background: #eef0f3; color: #495057; border-radius: 999px; padding: 0 .45rem; font-size: .75rem; }
   .kanban-tab.active { background: var(--ac-blue); border-color: var(--ac-blue); color: #fff; }
   .kanban-tab.active .kanban-tab-conteo { background: rgba(255,255,255,.25); color: #fff; }
-  .tablero-barra-filtro { display: none; }
 
   .dashboard-quick-actions {
     position: fixed;
@@ -554,26 +557,23 @@
     margin-top: 0;
     position: relative;
   }
-  html[data-modo="pestanas"] .kanban-col > .col-header { display: none; }
-  html[data-modo="pestanas"] .tablero-barra-filtro {
-    display: flex;
+  /* En pestañas la cabecera de la columna es la barra del menú Filtrar/Ordenar: sin título (ya está en la pestaña). */
+  html[data-modo="pestanas"] .kanban-col > .col-header {
     justify-content: flex-end;
-    align-items: center;
     height: 44px;
     flex: 0 0 44px;
+    margin-bottom: 0;
     border-bottom: 1px solid #edf0f3;
   }
-  html[data-modo="pestanas"] .tablero-filtro-icono {
-    width: 34px;
-    height: 34px;
-    border: 1px solid #dfe3e8;
-    border-radius: 50%;
-    background: #fff;
-    color: #697586;
-    padding: 0;
+  html[data-modo="pestanas"] .col-header > .col-title-group { display: none; }
+  html[data-modo="pestanas"] .col-header .btn-filter-pill {
+    width: 34px; height: 34px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
+    border: 1px solid #dfe3e8; border-radius: 50%; background: #fff; color: #697586;
   }
-  html[data-modo="pestanas"] .tablero-filtro-icono::after { display: none; }
-  html[data-modo="pestanas"] .tablero-barra-filtro + .contenedor-tarjetas { padding-top: 10px; }
+  html[data-modo="pestanas"] .col-header .btn-filter-pill::after { display: none; }
+  html[data-modo="pestanas"] .col-header .btn-filter-pill .filtro-texto { display: none; }
+  html[data-modo="pestanas"] .col-header .btn-filter-pill .filtro-icono { display: inline; }
+  html[data-modo="pestanas"] .col-header + .contenedor-tarjetas { padding-top: 10px; }
   .columna-color-en-proceso,
   .columna-color-hoy,
   .columna-color-vencidos { background-color: #fd7e14; }
@@ -606,8 +606,8 @@
   <div class="cabecera-tablero" id="cabeceraTablero">
   <div class="buscador-tablero" id="buscadorTablero"></div>
 
-  {# Solo con caja.ver (parte comercial). Producción no ve la barra: su filtro es "Solo mis pedidos" en cada
-     columna. El monto por cobrar se calcula en el servidor y solo existe aquí; nunca va en data-attributes. #}
+  {# Solo con caja.ver (parte comercial). Producción no ve la barra (solo ve sus pedidos asignados y su menú de
+     columna solo ordena). El monto por cobrar se calcula en el servidor y solo existe aquí; nunca va en data-attributes. #}
   {% if puede('caja.ver') %}
   <div class="barra-resumen" id="contadoresTablero">
     <span class="barra-fecha">{{ fecha_corta }}</span>
@@ -1181,6 +1181,15 @@
 
     // Búsqueda en todo el historial cuando el tablero no alcanza
     const ocultasPorFiltro = new WeakSet();   // la deja aplicarFiltros: pago, fecha o responsable
+    // Estado de los filtros por columna. La fuente de verdad es este objeto, no los <select>: así el
+    // resultado no depende de qué copia del menú esté a la vista (columnas o pestañas).
+    const filtros = {};
+    const filtrosDe = clave => filtros[clave] || (filtros[clave] = { pago: 'todos', fecha: 'todos', responsable: 'todos' });
+    const hayFiltrosActivos = () => Object.values(filtros).some(f => Object.values(f).some(v => v !== 'todos'));
+    function quitarFiltros() {
+      Object.keys(filtros).forEach(clave => delete filtros[clave]);
+      document.querySelectorAll('[data-filtro]').forEach(select => { select.value = 'todos'; });
+    }
     const historial = (function () {
       const ESPERA_TECLEO_MS = 400;
       const MIN_CARACTERES = 2;
@@ -1292,9 +1301,7 @@
       }
 
       document.getElementById('historialQuitarFiltros').addEventListener('click', () => {
-        document.querySelectorAll('.filtro-pago, .filtro-fecha, .filtro-responsable').forEach(select => {
-          select.value = 'todos';
-        });
+        quitarFiltros();
         contadorActivo = null;
         aplicarFiltros();
       });
@@ -1381,14 +1388,12 @@
       const columnas = [...tablero.querySelectorAll(':scope > .columna-kanban')];
       const llenas = columnas.map(c => !!c.querySelector('.contenedor-tarjetas > .card-pedido'));
       const hayAlguna = llenas.some(Boolean);
-      const hayFiltroActivo = !!contadorActivo ||
-        [...document.querySelectorAll('.filtro-pago, .filtro-fecha, .filtro-responsable')]
-          .some(el => el.value && el.value !== 'todos');
+      const hayFiltroActivo = !!contadorActivo || hayFiltrosActivos();
       columnas.forEach((c, i) => c.classList.toggle('columna-oculta',
         !hayFiltroActivo && hayAlguna && !llenas[i]));
       if (tableroProduccion) {
         tableroProduccion.style.setProperty('--cols',
-          llenas.map(l => (l || !hayAlguna || hayFiltroActivo) ? 'minmax(284px, 1fr)' : 'minmax(0, 0fr)').join(' '));
+          llenas.map(l => (l || !hayAlguna || hayFiltroActivo) ? 'minmax(280px, 1fr)' : 'minmax(0, 0fr)').join(' '));
       }
 
       // Aquí NO se cambia de modo (columnas ↔ pestañas): solo carga y redimensión lo reevalúan (pfModo).
@@ -1493,13 +1498,10 @@
       const hoyStr = fechaLocal(ahora);
 
       document.querySelectorAll('.columna-kanban').forEach(columna => {
-        const filtroPagoEl = columna.querySelector('.filtro-pago');
-        const filtroFechaEl = columna.querySelector('.filtro-fecha');
-        const filtroRespEl = columna.querySelector('.filtro-responsable');
-
-        const filtroPago = normalizar(filtroPagoEl ? filtroPagoEl.value : 'todos');
-        const filtroFecha = normalizar(filtroFechaEl ? filtroFechaEl.value : 'todos');
-        const filtroResp = normalizar(filtroRespEl ? filtroRespEl.value : 'todos');
+        const estado = filtrosDe(columna.dataset.col);
+        const filtroPago = normalizar(estado.pago);
+        const filtroFecha = normalizar(estado.fecha);
+        const filtroResp = normalizar(estado.responsable);
 
         const tarjetas = columna.querySelectorAll('.card-pedido');
         let tarjetasVisibles = 0;
@@ -1577,8 +1579,13 @@
       inputBusqueda.addEventListener('input', aplicarFiltrosDiferido);
     }
 
-    document.querySelectorAll('.filtro-pago, .filtro-fecha, .filtro-responsable').forEach(select => {
-      select.addEventListener('change', aplicarFiltros);
+    // Un solo menú por columna (el mismo en columnas y en pestañas): el cambio va al objeto de estado.
+    document.addEventListener('change', evento => {
+      const select = evento.target.closest('[data-filtro]');
+      const columna = select && select.closest('.columna-kanban');
+      if (!columna) return;
+      filtrosDe(columna.dataset.col)[select.dataset.filtro] = select.value;
+      aplicarFiltros();
     });
     // Fecha compacta según urgencia; se recalcula tras cada sincronización y cada minuto
     function hm(d) {
@@ -1608,7 +1615,9 @@
           if (n >= 7) clase = 'pc-vencido';
         } else {
           const d = new Date(t.dataset.orden), n = dias(d);
-          if (d < ahora) { texto = 'Vencido · ' + dm(d) + ' ' + hm(d); clase = 'pc-vencido'; }
+          // Producción en columnas: la columna es angosta, solo el día; la hora está en el detalle expandido.
+          const sinHora = tableroProduccion && enColumnas();
+          if (d < ahora) { texto = 'Vencido · ' + dm(d) + (sinHora ? '' : ' ' + hm(d)); clase = 'pc-vencido'; }
           else if (n === 0) { texto = 'Hoy · ' + hm(d); clase = 'pc-hoy'; }
           else if (n === 1) texto = 'Mañana · ' + hm(d);
           else texto = dm(d) + ' ' + hm(d);
@@ -1623,6 +1632,7 @@
       });
     }
     window.actualizarFechasTarjetas = actualizarFechasTarjetas;
+    window.addEventListener('pfmodo', () => actualizarFechasTarjetas());   // el texto de Vencido cambia con el modo
     actualizarFechasTarjetas();
 
     // Cada minuto: fechas y chips ("Vencido" depende de la hora). En segundo plano no corre;

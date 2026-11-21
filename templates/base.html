@@ -246,9 +246,10 @@
     (function () {
         var raiz = document.documentElement;
         var ANCHO_NAV = 992;      // la barra superior no cabe por debajo
-        var MIN_COLUMNA = 310;    // ancho útil mínimo de una columna (~320 px)
-        var GUTTER = 24;          // separación entre columnas (g-4)
-        var MARGENES = 56;        // relleno lateral del tablero
+        var MIN_COLUMNA = window.PF_MIN_COLUMNA || 310;   // ancho útil mínimo de una columna (~320 px); la página puede bajarlo
+        var GUTTER = window.PF_GUTTER != null ? window.PF_GUTTER : 24;        // separación entre columnas (g-4)
+        var MARGENES = window.PF_MARGENES != null ? window.PF_MARGENES : 56;   // relleno lateral del tablero
+        // Todo se mide contra raiz.clientWidth: el ancho útil, SIN la barra de scroll clásica (Windows).
         var HISTERESIS = 24;      // evita saltos por la barra de scroll al llegar justo al límite
         var columnas = window.PF_COLUMNAS_VISIBLES || 0;
 

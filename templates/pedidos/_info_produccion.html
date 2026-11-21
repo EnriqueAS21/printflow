@@ -34,6 +34,14 @@
   {% elif caller %}
   <div class="ip-encabezado-extra">{{ caller() }}</div>
   {% endif %}
+  {% if compacto and solo_sus_pedidos() %}
+  {# Producción: la tarjeta en columnas solo muestra el día de entrega; aquí va con la hora. #}
+  <div class="ip-sec">
+    <div class="ip-label">Entrega</div>
+    <div class="ip-valor"><i class="bi bi-calendar3 me-1"></i>
+      {{- pedido.fecha_entrega.strftime('%d/%m/%Y · %I:%M %p') if pedido.fecha_entrega else '—' }}</div>
+  </div>
+  {% endif %}
 
   {% if compacto %}
   <div class="ip-sec ip-cliente-linea">

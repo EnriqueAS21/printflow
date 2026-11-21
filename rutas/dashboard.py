@@ -47,7 +47,7 @@ COLUMNAS_PRODUCCION = (
     ('vencidos', 'Vencidos'),
     ('hoy', 'Para hoy'),
     ('proximos', 'Próximos'),
-    ('terminados-hoy', 'Terminados hoy'),
+    ('terminados-hoy', 'Listos'),   # terminados hoy; un solo título en todos los anchos
 )
 PLANTILLA_POR_COLUMNA_PRODUCCION = {   # la tarjeta solo distingue en_proceso / terminado
     'vencidos': 'en_proceso', 'hoy': 'en_proceso', 'proximos': 'en_proceso', 'terminados-hoy': 'terminado',
@@ -134,23 +134,36 @@ def _pagina_entregados(orden, despues=None):
     return filas[:PAGINA_ENTREGADOS], len(filas) > PAGINA_ENTREGADOS
 
 
-def _contexto_tarjeta():
-    """Datos que la tarjeta necesita además de `pedido` y `columna`."""
-    operadores_produccion = Usuario.query.filter_by(rol='Produccion').order_by(Usuario.nombre.asc()).all()
-    perfiles_foto = {
+def _perfiles_foto():
+    """Fotos de los operadores (activos o no: una tarjeta puede mostrar a un responsable dado de baja)."""
+    return {
         id_usuario: archivo
         for id_usuario, archivo in db.session.query(
             PerfilUsuario.id_usuario, PerfilUsuario.foto_archivo,
-        ).filter(
-            PerfilUsuario.id_usuario.in_([u.id_usuario for u in operadores_produccion]),
+        ).join(Usuario, Usuario.id_usuario == PerfilUsuario.id_usuario).filter(
+            Usuario.rol == 'Produccion',
             PerfilUsuario.foto_archivo.isnot(None),
         ).all()
     }
-    return {
-        'operadores': operadores_produccion,
-        'usuarios_produccion': operadores_produccion,
-        'perfiles_foto': perfiles_foto,
-    }
+
+
+def _contexto_tarjeta():
+    """Lo que la tarjeta necesita además de `pedido` y `columna`. Nunca incluye la lista de usuarios."""
+    return {'perfiles_foto': _perfiles_foto()}
+
+
+def _contexto_tablero():
+    """Contexto de la página completa.
+
+    Los operadores (menú Responsable y formulario de nota) solo se entregan a quien no se limita a sus
+    pedidos: Producción no debe recibir los nombres de sus compañeros, ni en el HTML ni en /cambios.
+    Solo operadores activos: no se asigna trabajo a quien está dado de baja.
+    """
+    contexto = _contexto_tarjeta()
+    if not solo_sus_pedidos():
+        operadores = Usuario.operadores_asignables()
+        contexto.update(operadores=operadores, usuarios_produccion=operadores)
+    return contexto
 
 
 def _renderizar_tarjetas(pedidos, por_fecha=False):
@@ -259,7 +272,7 @@ def index():
 
     columnas_produccion = None
     if _es_produccion():
-        # Producción: Vencidos · Para hoy · Próximos · Terminados hoy. No ve Entregado (ni su total).
+        # Producción: Vencidos · Para hoy · Próximos · Listos (terminados hoy). No ve Entregado (ni su total).
         hoy = ahora.date()
         terminados_hoy = _filtrar_por_rol(
             con_relaciones_tarjeta(Pedido.query).filter(
@@ -313,7 +326,7 @@ def index():
         por_cobrar=por_cobrar,
         hora_actual=ahora.strftime('%H:%M'),
         version_tablero=version,
-        **_contexto_tarjeta(),
+        **_contexto_tablero(),
     )
 
 

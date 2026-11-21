@@ -312,6 +312,15 @@ def _leer_lista_precio(form):
     return id_lista
 
 
+def _ids_responsables(pedido):
+    """Responsables actuales del pedido (pedido y líneas), para no perderlos del formulario si están de baja."""
+    ids = {u.id_usuario for u in pedido.responsables}
+    ids.update(d.asignacion.id_usuario for d in pedido.detalles if d.asignacion)
+    if pedido.id_usuario_produccion:
+        ids.add(pedido.id_usuario_produccion)
+    return ids
+
+
 def _leer_responsables(form):
     ids = []
     for raw in form.getlist('responsable_producto[]'):
@@ -636,7 +645,7 @@ def formulario_editar(id_pedido):
     return render_template(
         'pedidos/_formulario_pedido.html',
         pedido=pedido,
-        usuarios_produccion=Usuario.query.filter_by(rol='Produccion').order_by(Usuario.nombre).all(),
+        usuarios_produccion=Usuario.operadores_asignables(_ids_responsables(pedido)),
         origen_formulario='dashboard',
     )
 
@@ -840,7 +849,7 @@ def registrar_pedido():
         folio_sugerido=pedido.folio if pedido else previsualizar_siguiente_folio(),
         fecha_larga=f'{ahora.day:02d} de {MESES[ahora.month - 1]} {ahora.year}',
         hora_actual=ahora.strftime('%I:%M %p').lower(),
-        usuarios_produccion=Usuario.query.filter_by(rol='Produccion').order_by(Usuario.nombre).all(),
+        usuarios_produccion=Usuario.operadores_asignables(_ids_responsables(pedido) if pedido else ()),
         listas_precio=(listas := _listas_precio_activas()),
         lista_precio_predeterminada=next(
             (lista['id_lista'] for lista in listas if lista['predeterminada']), None

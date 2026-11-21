@@ -176,7 +176,7 @@ def index():
         fecha_larga=_fecha_larga(ahora),
         hora_actual=ahora.strftime('%I:%M %p').lower(),
         folio_sugerido=previsualizar_siguiente_folio(),
-        usuarios_produccion=Usuario.query.filter_by(rol='Produccion').all(),
+        usuarios_produccion=Usuario.operadores_asignables(),
     )
 
 
