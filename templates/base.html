@@ -14,7 +14,39 @@
     <link href="{{ url_for('static', filename='vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='vendor/fonts/fonts.css') }}" rel="stylesheet">
     <style>
-        :root { --pf-nav: #1d63ed; --pf-navy: #0b2a6f; --pf-tabbar-alto: 64px; }
+        :root {
+            --pf-nav: #1d63ed;
+            --pf-navy: #0b2a6f;
+            --pf-tabbar-alto: 64px;
+            --pf-nav-superior-alto: 88px;
+            --pf-nav-movil-alto: 56px;
+        }
+
+        /* Layout reutilizable para pantallas que deben caber exactamente entre la navegación y la barra inferior. */
+        .pantalla-fija {
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            height: calc(100dvh - var(--pf-nav-superior-alto) - 16px);
+        }
+        .pantalla-fija__cabecera {
+            flex: 0 0 auto;
+        }
+        .pantalla-fija__lista {
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+        }
+        .pantalla-fija__lista thead th {
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            background: #fff;
+        }
+        html[data-modo="pestanas"] .pantalla-fija {
+            height: calc(100dvh - var(--pf-nav-movil-alto) - var(--pf-tabbar-alto) - .75rem - env(safe-area-inset-bottom) - 12px);
+        }
 
         /* Modo de interfaz: lo fija pfModo (script del <head>) en <html data-modo="columnas|pestanas">.
            columnas = barra superior (+ columnas lado a lado en el tablero); pestanas = barra inferior (+ pestañas).
@@ -248,6 +280,23 @@
             window.addEventListener('resize', reevaluar);
             var contenedor = document.querySelector('main');
             if ('ResizeObserver' in window && contenedor) new ResizeObserver(reevaluar).observe(contenedor);
+
+            var raizEstilo = document.documentElement.style;
+            function medirNavegacion() {
+                var navSuperior = document.querySelector('.pf-nav-wrap');
+                var navMovil = document.querySelector('.pf-nav-movil-wrap');
+                if (navSuperior) raizEstilo.setProperty('--pf-nav-superior-alto', navSuperior.getBoundingClientRect().height + 'px');
+                if (navMovil) raizEstilo.setProperty('--pf-nav-movil-alto', navMovil.getBoundingClientRect().height + 'px');
+            }
+            medirNavegacion();
+            window.addEventListener('resize', medirNavegacion);
+            window.addEventListener('pfmodo', medirNavegacion);
+            if ('ResizeObserver' in window) {
+                var navSuperior = document.querySelector('.pf-nav-wrap');
+                var navMovil = document.querySelector('.pf-nav-movil-wrap');
+                if (navSuperior) new ResizeObserver(medirNavegacion).observe(navSuperior);
+                if (navMovil) new ResizeObserver(medirNavegacion).observe(navMovil);
+            }
         });
     })();
     </script>
@@ -317,14 +366,14 @@
                             {% if ver_nota %}
                             <li><a class="dropdown-item {% if request.blueprint == 'configuracion' %}active{% endif %}" href="{{ url_for('configuracion.nota') }}">Diseño Nota</a></li>
                             {% endif %}
-                            {% if puede('productos.administrar') and modulo_activo('configuracion') %}
-                            <li><a class="dropdown-item {% if request.endpoint == 'configuracion.procesos' %}active{% endif %}" href="{{ url_for('configuracion.procesos') }}">Procesos de producción</a></li>
-                            {% endif %}
                             {% if ver_reportes %}
                             <li><a class="dropdown-item {% if request.blueprint == 'reportes' %}active{% endif %}" href="{{ url_for('reportes.index') }}">Reportes</a></li>
                             {% endif %}
                             {% if ver_productos %}
                             <li><a class="dropdown-item {% if request.blueprint == 'productos' %}active{% endif %}" href="{{ url_for('productos.lista') }}">Productos</a></li>
+                            {% endif %}
+                            {% if puede('productos.administrar') and modulo_activo('configuracion') %}
+                            <li><a class="dropdown-item {% if request.endpoint == 'configuracion.procesos' %}active{% endif %}" href="{{ url_for('configuracion.procesos') }}">Procesos de producción</a></li>
                             {% endif %}
                             {% if ver_stickers %}
                             <li><a class="dropdown-item {% if request.blueprint == 'stickers' %}active{% endif %}" href="{{ url_for('stickers.index') }}">Stickers</a></li>
@@ -499,6 +548,9 @@
                 {% endif %}
                 {% if ver_productos %}
                 <a class="list-group-item list-group-item-action" href="{{ url_for('productos.lista') }}"><i class="bi bi-box-seam me-2"></i>Productos</a>
+                {% endif %}
+                {% if puede('productos.administrar') and modulo_activo('configuracion') %}
+                <a class="list-group-item list-group-item-action {% if request.endpoint == 'configuracion.procesos' %}active{% endif %}" href="{{ url_for('configuracion.procesos') }}"><i class="bi bi-diagram-3 me-2"></i>Procesos de producción</a>
                 {% endif %}
                 {% if ver_stickers %}
                 <a class="list-group-item list-group-item-action" href="{{ url_for('stickers.index') }}"><i class="bi bi-emoji-smile me-2"></i>Stickers</a>

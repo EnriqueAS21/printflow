@@ -2,9 +2,10 @@
 from io import BytesIO
 from pathlib import Path
 import re
+from types import SimpleNamespace
 from uuid import uuid4
 
-from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
+from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, request, url_for
 from reportlab.lib.utils import ImageReader
 from werkzeug.utils import secure_filename
 
@@ -19,8 +20,10 @@ from modelos.producto import Producto
 from modelos.produccion import (
     LineaPaso, ProductoPaso, Proceso, ReglaClasificacion, ReglaPaso,
 )
+from modelos.envios import MENSAJE_DUPLICADO, reclamar_envio
 from servicios.rutas_produccion import invalidar
 from servicios.permisos import permiso_requerido
+from servicios.textos import normalizar_nombre
 
 configuracion_bp = Blueprint("configuracion", __name__, template_folder="../templates")
 EXTENSIONES_LOGO = {"png", "jpg", "jpeg"}
@@ -163,10 +166,18 @@ def _proceso_en_uso(proceso):
 @permiso_requerido("productos.administrar")
 def procesos():
     if request.method == "POST":
-        accion = (request.form.get("accion") or "").strip()
+        datos_json = request.get_json(silent=True)
+        datos = datos_json if isinstance(datos_json, dict) else request.form
+        accion = (datos.get("accion") or "").strip()
+        es_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
         try:
+            if not reclamar_envio(datos.get("token_envio")):
+                if es_ajax or accion == "reordenar":
+                    return jsonify(ok=False, error=MENSAJE_DUPLICADO), 409
+                raise ValueError(MENSAJE_DUPLICADO)
+
             if accion == "crear":
-                nombre = (request.form.get("nombre") or "").strip()
+                nombre = normalizar_nombre(datos.get("nombre"))
                 if not nombre:
                     raise ValueError("El nombre del proceso es obligatorio.")
                 if len(nombre) > 80:
@@ -181,21 +192,29 @@ def procesos():
                 db.session.commit()
                 invalidar()
                 flash("Proceso creado.", "success")
+                if es_ajax or accion == "reordenar":
+                    return jsonify(ok=True)
                 return redirect(url_for("configuracion.procesos"))
 
-            id_proceso = int(request.form.get("id_proceso") or 0)
-            proceso = db.session.get(Proceso, id_proceso)
-            if proceso is None:
-                raise ValueError("El proceso no existe.")
+            proceso = None
+            if accion == "reordenar":
+                proceso = SimpleNamespace(id_proceso=None, nombre="orden", activo=True)
+            else:
+                id_proceso = int(datos.get("id_proceso") or 0)
+                proceso = db.session.get(Proceso, id_proceso)
+                if proceso is None:
+                    raise ValueError("El proceso no existe.")
 
             if accion == "editar":
                 if _es_sin_clasificar(proceso):
                     raise ValueError('"Sin clasificar" no se puede editar.')
-                nombre = (request.form.get("nombre") or "").strip()
+                nombre = normalizar_nombre(datos.get("nombre"))
                 if not nombre:
                     raise ValueError("El nombre del proceso es obligatorio.")
                 if len(nombre) > 80:
                     raise ValueError("El nombre no puede superar 80 caracteres.")
+                if nombre.lower() == "sin clasificar":
+                    raise ValueError('"Sin clasificar" está reservado.')
                 duplicado = (
                     Proceso.query
                     .filter(db.func.lower(Proceso.nombre) == nombre.lower(), Proceso.id_proceso != proceso.id_proceso)
@@ -209,6 +228,31 @@ def procesos():
                 if _es_sin_clasificar(proceso):
                     raise ValueError('"Sin clasificar" no se puede desactivar.')
                 proceso.activo = not bool(proceso.activo)
+
+            elif accion == "reordenar":
+                if isinstance(datos_json, dict):
+                    ids = [str(valor) for valor in (datos_json.get("orden") or [])]
+                else:
+                    ids = datos.getlist("orden[]")
+                if not ids:
+                    raise ValueError("No hay procesos para ordenar.")
+                lista_por_id = {
+                    fila.id_proceso: fila
+                    for fila in Proceso.query.filter(
+                        Proceso.id_proceso.in_([int(valor) for valor in ids])
+                    ).all()
+                }
+                for orden, valor in enumerate(ids, start=1):
+                    fila = lista_por_id.get(int(valor))
+                    if fila is not None and not _es_sin_clasificar(fila):
+                        fila.orden = orden
+                sistema = [
+                    fila for fila in Proceso.query.all()
+                    if _es_sin_clasificar(fila)
+                ]
+                ultimo = len(ids)
+                for fila in sistema:
+                    fila.orden = ultimo + 1
 
             elif accion in ("subir", "bajar"):
                 lista = Proceso.query.order_by(Proceso.orden, Proceso.nombre, Proceso.id_proceso).all()
@@ -235,14 +279,41 @@ def procesos():
             db.session.commit()
             invalidar()
             flash("Procesos actualizados.", "success")
+            if es_ajax or accion == "reordenar":
+                respuesta = {
+                    "ok": True,
+                    "id_proceso": proceso.id_proceso,
+                    "nombre": proceso.nombre,
+                    "activo": bool(proceso.activo),
+                }
+                if accion == "reordenar":
+                    if isinstance(datos_json, dict):
+                        respuesta["orden"] = [int(valor) for valor in (datos_json.get("orden") or [])]
+                    else:
+                        respuesta["orden"] = [int(valor) for valor in datos.getlist("orden[]")]
+                return jsonify(respuesta)
         except ValueError as exc:
             db.session.rollback()
             flash(str(exc), "warning")
+            if es_ajax or accion == "reordenar":
+                return jsonify(ok=False, error=str(exc)), 400
         except Exception:
             db.session.rollback()
             current_app.logger.exception("Error al guardar procesos")
             flash("No se pudo guardar el proceso.", "danger")
+            if es_ajax or accion == "reordenar":
+                return jsonify(ok=False, error="No se pudo guardar el proceso."), 500
         return redirect(url_for("configuracion.procesos"))
 
-    procesos = Proceso.query.order_by(Proceso.orden, Proceso.nombre, Proceso.id_proceso).all()
-    return render_template("configuracion/procesos.html", procesos=procesos)
+    todos = Proceso.query.order_by(Proceso.orden, Proceso.nombre, Proceso.id_proceso).all()
+    normales = [fila for fila in todos if not _es_sin_clasificar(fila)]
+    procesos = (
+        [fila for fila in normales if fila.activo]
+        + [fila for fila in normales if not fila.activo]
+        + [fila for fila in todos if _es_sin_clasificar(fila)]
+    )
+    return render_template(
+        "configuracion/procesos.html",
+        procesos=procesos,
+        total_procesos=len(normales),
+    )

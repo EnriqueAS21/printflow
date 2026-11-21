@@ -8,3 +8,4 @@ scripts/migrar_indices_rendimiento.py
 scripts/migrar_fecha_entregado.py
 scripts/normalizar_datos.py
 scripts/migrar_rutas_produccion.py
+scripts/normalizar_procesos.py

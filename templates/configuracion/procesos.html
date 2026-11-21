@@ -1,91 +1,384 @@
 {% extends 'base.html' %}
-{% block title %}Procesos de producción{% endblock %}
+{% block title %}Procesos de produccion{% endblock %}
+
+{% block styles %}
+{% include 'clientes/_estilos.html' %}
+<style>
+  body[data-blueprint="configuracion"] main.py-4 { padding-top: 0 !important; padding-bottom: 0 !important; }
+  .procesos-pantalla { max-width: 860px; }
+  .procesos-pantalla > * { min-width: 0; }
+  .procesos-pantalla__nueva {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    margin-bottom: .45rem;
+  }
+  .procesos-pantalla__nueva .form-control {
+    min-width: 0;
+    border-radius: 999px;
+  }
+  .procesos-pantalla__nueva .btn {
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
+    padding: 0;
+    border-radius: 50%;
+    font-size: 1.35rem;
+  }
+
+  .procesos-lista {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+  .procesos-lista.pantalla-fija__lista {
+    display: flex;
+    flex-direction: column;
+  }
+  #listaProcesos {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .proceso-fila {
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr) 48px 40px;
+    align-items: center;
+    gap: .35rem;
+    min-height: 56px;
+    border-bottom: 1px solid #edf0f3;
+  }
+  .proceso-fila:last-child { border-bottom: 0; }
+  .proceso-fila.inactivo { background: #f7f7f8; color: #8a9096; }
+  .proceso-fila.sistema { background: #f8fafc; color: #5d6670; }
+  .proceso-arrastre {
+    width: 28px;
+    text-align: center;
+    color: #a0a7ae;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+  }
+  .proceso-arrastre:active { cursor: grabbing; }
+  .proceso-fila.sistema .proceso-arrastre { cursor: default; }
+  .proceso-nombre {
+    min-width: 0;
+    font-weight: 650;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .nombre-texto { cursor: text; }
+  .proceso-editar {
+    height: 38px;
+    width: 100%;
+    border-radius: 10px;
+    background: #fff !important;
+  }
+  .estado-inactivo { font-size: .68rem; vertical-align: middle; }
+  .proceso-estado {
+    display: flex;
+    justify-content: center;
+  }
+  .proceso-estado .form-switch { margin: 0; }
+  .proceso-estado .form-check-input {
+    width: 2.25em;
+    height: 1.15em;
+    cursor: pointer;
+  }
+  .proceso-menu { text-align: right; }
+  .proceso-menu > .dropdown > .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    min-height: 40px;
+    padding: 0;
+    border-radius: 50%;
+    color: #667085;
+    font-size: 1.25rem;
+    line-height: 1;
+    text-decoration: none;
+  }
+  .proceso-menu > .dropdown > .btn:hover { background: #eef1f5; color: #344054; }
+  .proceso-menu > .dropdown > .btn:focus-visible,
+  .proceso-menu > .dropdown > .btn.show {
+    background: #e4ebf5;
+    color: #1d63ed;
+    outline: 2px solid #1d63ed;
+    outline-offset: 1px;
+    box-shadow: none;
+  }
+  .proceso-menu .dropdown-menu {
+    border: 0;
+    border-radius: 14px;
+    box-shadow: 0 10px 24px rgba(23, 67, 107, .16);
+  }
+  .proceso-menu .dropdown-toggle.no-caret::after { display: none; }
+  .proceso-menu .dropdown-item { border-radius: 8px; }
+  .proceso-fila.sortable-ghost { opacity: .35; background: #eef4ff; }
+  .proceso-fila.sortable-chosen { background: #f2f7ff; }
+
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="container" style="max-width: 860px;">
-  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
-    <div>
-      <h1 class="h3 fw-bold mb-1">Procesos de producción</h1>
-      <p class="text-muted mb-0">Administra las estaciones y su orden.</p>
-    </div>
-  </div>
-
-  <form method="POST" class="card border-0 shadow-sm mb-4">
-    <div class="card-body d-flex flex-wrap align-items-end gap-2">
-      <input type="hidden" name="accion" value="crear">
-      <div class="flex-grow-1">
-        <label class="form-label fw-semibold" for="nombre_proceso">Nuevo proceso</label>
-        <input class="form-control" id="nombre_proceso" name="nombre" maxlength="80" required>
+<div class="container pantalla-fija procesos-pantalla pf-pagina-gutter mt-0 mb-0 pf-form">
+  <div class="pantalla-fija__cabecera">
+    <div class="encabezado-pagina">
+      <span class="encabezado-pagina__icono" aria-hidden="true"><i class="bi bi-diagram-3"></i></span>
+      <div class="encabezado-pagina__texto">
+        <h1 class="encabezado-pagina__titulo">Procesos de producción</h1>
+        <p class="encabezado-pagina__subtitulo">
+          <span id="conteoProcesos">{{ total_procesos }}</span> procesos · arrastra ⋮⋮ para ordenar
+        </p>
       </div>
-      <button type="submit" class="btn btn-primary rounded-pill px-4">Agregar</button>
     </div>
-  </form>
-
-  <div class="card border-0 shadow-sm">
-    <div class="table-responsive">
-      <table class="table align-middle mb-0">
-        <thead>
-          <tr>
-            <th>Proceso</th>
-            <th class="text-center">Estado</th>
-            <th class="text-end">Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for proceso in procesos %}
-          <tr>
-            <td>
-              <form method="POST" class="d-flex align-items-center gap-2" style="max-width: 360px;">
-                <input type="hidden" name="accion" value="editar">
-                <input type="hidden" name="id_proceso" value="{{ proceso.id_proceso }}">
-                <input class="form-control" name="nombre" value="{{ proceso.nombre }}"
-                       maxlength="80" {% if proceso.es_sistema or proceso.nombre|lower == 'sin clasificar' %}readonly{% endif %}>
-                {% if not (proceso.es_sistema or proceso.nombre|lower == 'sin clasificar') %}
-                <button type="submit" class="btn btn-outline-primary btn-sm rounded-pill" title="Guardar nombre">Guardar</button>
-                {% endif %}
-              </form>
-            </td>
-            <td class="text-center">
-              {% if proceso.activo %}
-              <span class="badge text-bg-success">Activo</span>
-              {% else %}
-              <span class="badge text-bg-secondary">Inactivo</span>
-              {% endif %}
-            </td>
-            <td>
-              <div class="d-flex justify-content-end gap-1">
-                <form method="POST">
-                  <input type="hidden" name="accion" value="subir">
-                  <input type="hidden" name="id_proceso" value="{{ proceso.id_proceso }}">
-                  <button type="submit" class="btn btn-outline-secondary btn-sm" title="Subir">↑</button>
-                </form>
-                <form method="POST">
-                  <input type="hidden" name="accion" value="bajar">
-                  <input type="hidden" name="id_proceso" value="{{ proceso.id_proceso }}">
-                  <button type="submit" class="btn btn-outline-secondary btn-sm" title="Bajar">↓</button>
-                </form>
-                {% if not (proceso.es_sistema or proceso.nombre|lower == 'sin clasificar') %}
-                <form method="POST">
-                  <input type="hidden" name="accion" value="activar">
-                  <input type="hidden" name="id_proceso" value="{{ proceso.id_proceso }}">
-                  <button type="submit" class="btn btn-sm {{ 'btn-outline-secondary' if proceso.activo else 'btn-outline-success' }}">
-                    {{ 'Desactivar' if proceso.activo else 'Activar' }}
-                  </button>
-                </form>
-                {% endif %}
-              </div>
-            </td>
-          </tr>
-          {% else %}
-          <tr><td colspan="3" class="text-center text-muted py-4">No hay procesos configurados.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
+    <form id="formNuevoProceso" class="procesos-pantalla__nueva" method="POST">
+      <input type="hidden" name="accion" value="crear">
+      <input type="hidden" name="token_envio" value="{{ token_envio() }}">
+      <input class="form-control" id="nombre_proceso" name="nombre" maxlength="80"
+             placeholder="Nuevo proceso" autocomplete="off" aria-label="Nuevo proceso" required>
+      <button type="submit" class="btn btn-primary" title="Agregar proceso" aria-label="Agregar proceso">+</button>
+    </form>
   </div>
 
-  <div class="mt-3">
-    <a href="{{ url_for('dashboard.index') }}" class="btn btn-outline-secondary rounded-pill px-4">Volver</a>
+  <div class="form-card pantalla-fija__lista procesos-lista">
+    <div id="listaProcesos" role="list">
+      {% for proceso in procesos %}
+      {% set sistema = proceso.es_sistema or proceso.nombre|lower == 'sin clasificar' %}
+      <div class="proceso-fila {% if not proceso.activo and not sistema %}inactivo{% endif %} {% if sistema %}sistema{% endif %}"
+           data-id="{{ proceso.id_proceso }}" data-sistema="{{ '1' if sistema else '0' }}"
+           data-activo="{{ '1' if proceso.activo else '0' }}" role="listitem">
+        <div class="proceso-arrastre" aria-label="{{ 'Proceso fijo' if sistema else 'Arrastrar proceso' }}">
+          {% if sistema %}<i class="bi bi-lock-fill small"></i>{% else %}⋮⋮{% endif %}
+        </div>
+        <div class="proceso-nombre">
+          {% if sistema %}
+          <span>{{ proceso.nombre }}</span>
+          <span class="badge text-bg-light border ms-2">Sistema</span>
+          {% else %}
+          <span class="nombre-texto" title="Tocar para editar">{{ proceso.nombre }}</span>
+          {% if not proceso.activo %}
+          <span class="badge text-bg-secondary ms-2 estado-inactivo">Inactivo</span>
+          {% endif %}
+          <input class="form-control proceso-editar d-none" maxlength="80"
+                 value="{{ proceso.nombre }}" aria-label="Nombre del proceso">
+          {% endif %}
+        </div>
+        <div class="proceso-estado">
+          {% if not sistema %}
+          <div class="form-check form-switch">
+            <input class="form-check-input proceso-switch" type="checkbox" role="switch"
+                   aria-label="Activar o desactivar {{ proceso.nombre }}"
+                   {% if proceso.activo %}checked{% endif %}>
+          </div>
+          {% endif %}
+        </div>
+        <div class="proceso-menu">
+          {% if not sistema %}
+          <div class="dropdown">
+            <button class="btn btn-link dropdown-toggle no-caret" type="button" data-bs-toggle="dropdown"
+                    aria-expanded="false" aria-label="Acciones para {{ proceso.nombre }}">⋯</button>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><button type="button" class="dropdown-item proceso-editar-menu">Editar</button></li>
+              <li><button type="button" class="dropdown-item proceso-subir">Subir</button></li>
+              <li><button type="button" class="dropdown-item proceso-bajar">Bajar</button></li>
+            </ul>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      {% else %}
+      <div class="text-center text-muted py-4">No hay procesos configurados.</div>
+      {% endfor %}
+    </div>
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
+<script>
+(() => {
+  const lista = document.getElementById('listaProcesos');
+  const formNuevo = document.getElementById('formNuevoProceso');
+  const conteo = document.getElementById('conteoProcesos');
+  const url = {{ url_for('configuracion.procesos')|tojson }};
+
+  function nuevoTokenEnvio() {
+    if (typeof window.crypto?.getRandomValues === 'function') {
+      const bytes = new Uint8Array(16);
+      crypto.getRandomValues(bytes);
+      return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+    }
+    return '{{ token_envio() }}';
+  }
+
+  async function post(payload) {
+    payload.token_envio = nuevoTokenEnvio();
+    const respuesta = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+      body: JSON.stringify(payload),
+    });
+    const contentType = respuesta.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      throw new Error(respuesta.ok
+        ? 'El servidor respondió con un formato inesperado.'
+        : `No se pudo guardar (HTTP ${respuesta.status}).`);
+    }
+    let cuerpo;
+    try { cuerpo = await respuesta.json(); }
+    catch (_) { throw new Error('La respuesta del servidor no contiene JSON válido.'); }
+    if (!respuesta.ok || cuerpo.ok === false) {
+      throw new Error(cuerpo.error || `No se pudo guardar (HTTP ${respuesta.status}).`);
+    }
+    if (cuerpo.ok !== true) throw new Error('El servidor no confirmó la operación.');
+    return cuerpo;
+  }
+
+  function filasEditables() {
+    return [...lista.querySelectorAll('.proceso-fila')]
+      .filter(fila => fila.dataset.sistema !== '1');
+  }
+  function sistemaFila() {
+    return lista.querySelector('.proceso-fila[data-sistema="1"]');
+  }
+  function normalizarGrupos() {
+    const activo = filasEditables().filter(fila => fila.dataset.activo === '1');
+    const inactivo = filasEditables().filter(fila => fila.dataset.activo === '0');
+    const sistema = sistemaFila();
+    [...activo, ...inactivo].forEach(fila => {
+      if (sistema) sistema.before(fila);
+    });
+  }
+
+  async function guardarOrden() {
+    normalizarGrupos();
+    const orden = [...filasEditables(), sistemaFila()].filter(Boolean).map(fila => Number(fila.dataset.id));
+    try { await post({ accion: 'reordenar', orden }); }
+    catch (error) { alert(error.message); window.location.reload(); }
+  }
+
+  formNuevo.addEventListener('submit', async evento => {
+    evento.preventDefault();
+    const boton = formNuevo.querySelector('button');
+    boton.disabled = true;
+    try {
+      await post({ accion: 'crear', nombre: formNuevo.elements.nombre.value });
+      window.location.reload();
+    } catch (error) {
+      alert(error.message);
+      boton.disabled = false;
+    }
+  });
+
+  function iniciarEdicion(fila) {
+    const texto = fila.querySelector('.nombre-texto');
+    const etiqueta = fila.querySelector('.estado-inactivo');
+    const input = fila.querySelector('.proceso-editar');
+    if (!input) return;
+    texto.classList.add('d-none');
+    if (etiqueta) etiqueta.classList.add('d-none');
+    input.classList.remove('d-none');
+    input.dataset.original = input.value;
+    input.focus();
+    input.select();
+  }
+
+  function cancelarEdicion(input) {
+    const fila = input.closest('.proceso-fila');
+    input.value = input.dataset.original || input.value;
+    input.classList.add('d-none');
+    fila.querySelector('.nombre-texto').classList.remove('d-none');
+    const etiqueta = fila.querySelector('.estado-inactivo');
+    if (etiqueta) etiqueta.classList.remove('d-none');
+  }
+
+  lista.addEventListener('click', async evento => {
+    const nombre = evento.target.closest('.nombre-texto');
+    if (nombre) iniciarEdicion(nombre.closest('.proceso-fila'));
+
+    const editar = evento.target.closest('.proceso-editar-menu');
+    if (editar) iniciarEdicion(editar.closest('.proceso-fila'));
+
+    const subir = evento.target.closest('.proceso-subir');
+    const bajar = evento.target.closest('.proceso-bajar');
+    if (subir || bajar) {
+      const fila = (subir || bajar).closest('.proceso-fila');
+      const filas = filasEditables();
+      const indice = filas.indexOf(fila);
+      const destino = subir ? indice - 1 : indice + 1;
+      if (destino >= 0 && destino < filas.length) {
+        if (subir) filas[destino].before(fila);
+        else filas[destino].after(fila);
+        await guardarOrden();
+      }
+    }
+  });
+
+  lista.addEventListener('keydown', async evento => {
+    const input = evento.target.closest('.proceso-editar');
+    if (!input) return;
+    if (evento.key === 'Escape') {
+      evento.preventDefault();
+      cancelarEdicion(input);
+    } else if (evento.key === 'Enter') {
+      evento.preventDefault();
+      const fila = input.closest('.proceso-fila');
+      try {
+        const resultado = await post({ accion: 'editar', id_proceso: Number(fila.dataset.id), nombre: input.value });
+        fila.querySelector('.nombre-texto').textContent = resultado.nombre;
+        cancelarEdicion(input);
+      } catch (error) {
+        alert(error.message);
+        input.focus();
+      }
+    }
+  });
+
+  lista.addEventListener('change', async evento => {
+    const interruptor = evento.target.closest('.proceso-switch');
+    if (!interruptor) return;
+    const fila = interruptor.closest('.proceso-fila');
+    try {
+      const resultado = await post({ accion: 'activar', id_proceso: Number(fila.dataset.id) });
+      fila.dataset.activo = resultado.activo ? '1' : '0';
+      fila.classList.toggle('inactivo', !resultado.activo);
+      let etiqueta = fila.querySelector('.estado-inactivo');
+      if (!resultado.activo) {
+        if (!etiqueta) {
+          etiqueta = document.createElement('span');
+          etiqueta.className = 'badge text-bg-secondary ms-2 estado-inactivo';
+          etiqueta.textContent = 'Inactivo';
+          fila.querySelector('.proceso-nombre').insertBefore(etiqueta, fila.querySelector('.proceso-editar'));
+        }
+      } else if (etiqueta) {
+        etiqueta.remove();
+      }
+      await guardarOrden();
+      conteo.textContent = String(filasEditables().length);
+    } catch (error) {
+      interruptor.checked = !interruptor.checked;
+      alert(error.message);
+    }
+  });
+
+  if (window.Sortable) {
+    new Sortable(lista, {
+      animation: 150,
+      handle: '.proceso-arrastre',
+      filter: '.sistema',
+      draggable: '.proceso-fila:not(.sistema)',
+      onEnd: guardarOrden,
+    });
+  }
+})();
+</script>
 {% endblock %}
