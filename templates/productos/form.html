@@ -2,6 +2,10 @@
 
 {% block title %}{{ 'Editar producto' if producto else 'Nuevo producto' }} - Área Creativa{% endblock %}
 
+{% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/editor_ruta.css') }}">
+{% endblock %}
+
 {% block content %}
 <style>
     #presentaciones {
@@ -129,6 +133,52 @@
             </div>
         </section>
 
+        <section class="card border-0 shadow-sm rounded-4 mb-4" id="seccionRuta"
+                 data-procesos='{{ procesos|tojson }}'
+                 data-url-ruta="{{ url_for('productos.ruta_guardada', id_producto=0) }}"
+                 {% if producto %}data-id-producto="{{ producto.id_producto }}"
+                 data-url-aplicar="{{ url_for('productos.aplicar_ruta_categoria', id_producto=producto.id_producto) }}"{% endif %}
+                 data-url-buscar="{{ url_for('productos.buscar') }}">
+            <div class="card-body p-4">
+                <h5 class="fw-semibold mb-1">Ruta de producción</h5>
+                <p class="text-muted small mb-3">Procesos por los que pasa cada línea de este producto, en orden.</p>
+                <div id="editorRuta"></div>
+
+                <details class="mt-3">
+                    <summary class="small fw-semibold">Copiar ruta de otro producto</summary>
+                    <div class="position-relative mt-2">
+                        <input type="search" class="form-control" id="copiarRutaBuscar" autocomplete="off"
+                               placeholder="Buscar producto por nombre o clave" aria-label="Buscar producto para copiar su ruta">
+                        <div class="list-group position-absolute w-100 shadow-sm d-none" id="copiarRutaResultados" style="z-index: 5;"></div>
+                    </div>
+                    <div class="small text-muted mt-1" id="copiarRutaEstado" role="status"></div>
+                </details>
+
+                {% if producto %}
+                <details class="mt-3">
+                    <summary class="small fw-semibold">Aplicar ruta a la categoría</summary>
+                    <div class="mt-2">
+                        {% if not producto.categoria %}
+                        <div class="small text-muted">Asigna una categoría al producto y guarda para usar esta opción.</div>
+                        {% else %}
+                        <p class="small text-muted mb-2">Copia la ruta <strong>guardada</strong> de este producto a los demás productos de «{{ producto.categoria }}».</p>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="modoAplicar" id="modoSinRuta" value="sin_ruta" checked>
+                            <label class="form-check-label" for="modoSinRuta">Solo productos sin ruta</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="modoAplicar" id="modoTodas" value="todas">
+                            <label class="form-check-label" for="modoTodas">Sobrescribir todas</label>
+                        </div>
+                        <button type="button" class="btn btn-outline-primary btn-sm mt-2" id="aplicarRutaCategoria">Aplicar a la categoría</button>
+                        <div class="small mt-2" id="aplicarRutaEstado" role="status"></div>
+                        {% endif %}
+                    </div>
+                </details>
+                {% endif %}
+            </div>
+        </section>
+
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
             <h5 class="fw-semibold mb-0">Presentaciones</h5>
         </div>
@@ -148,5 +198,7 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
+<script src="{{ url_for('static', filename='js/editor_ruta.js') }}"></script>
 <script src="{{ url_for('static', filename='productos/form.js') }}" defer></script>
 {% endblock %}

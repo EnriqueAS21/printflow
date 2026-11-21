@@ -1,0 +1,51 @@
+/* Editor de ruta de producción (static/js/editor_ruta.js). Mismo estilo de filas que la pantalla de procesos. */
+.er-vista {
+  background: #f8fafc;
+  border: 1px solid #edf0f3;
+  border-radius: 10px;
+  color: #344054;
+  font-size: .85rem;
+  font-weight: 600;
+  letter-spacing: .02em;
+  margin-bottom: .6rem;
+  min-height: 40px;
+  overflow-wrap: anywhere;
+  padding: .55rem .75rem;
+}
+.er-vista.vacia { color: #8a9096; font-weight: 400; }
+.er-lista { border: 1px solid #edf0f3; border-radius: 12px; overflow: hidden; }
+.er-lista:empty { display: none; }
+.er-fila {
+  align-items: center;
+  background: #fff;
+  border-bottom: 1px solid #edf0f3;
+  display: grid;
+  gap: .35rem;
+  grid-template-columns: 28px minmax(0, 1fr) auto 40px;
+  min-height: 52px;
+}
+.er-fila:last-child { border-bottom: 0; }
+.er-fila.invalida { background: #fff5f5; }
+.er-arrastre { color: #a0a7ae; cursor: grab; text-align: center; touch-action: none; user-select: none; }
+.er-arrastre:active { cursor: grabbing; }
+.er-nombre { font-weight: 650; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.er-opcional { align-items: center; display: flex; gap: .35rem; font-size: .85rem; margin: 0; white-space: nowrap; }
+.er-opcional .form-check-input { margin: 0; }
+.er-menu { text-align: right; }
+.er-menu > .dropdown > .btn {
+  align-items: center; border-radius: 50%; color: #667085; display: inline-flex; font-size: 1.25rem;
+  height: 40px; justify-content: center; line-height: 1; min-height: 40px; padding: 0; text-decoration: none; width: 40px;
+}
+.er-menu > .dropdown > .btn:hover { background: #eef1f5; color: #344054; }
+.er-menu .dropdown-toggle.no-caret::after { display: none; }
+.er-menu .dropdown-menu { border: 0; border-radius: 14px; box-shadow: 0 10px 24px rgba(23, 67, 107, .16); }
+.er-fila.sortable-ghost { background: #eef4ff; opacity: .35; }
+.er-agregar { display: flex; gap: .5rem; margin-top: .6rem; }
+.er-agregar .form-select { min-width: 0; }
+.er-agregar .btn { flex: 0 0 auto; white-space: nowrap; }
+.er-error { color: #dc3545; font-size: .85rem; margin-top: .4rem; }
+@media (max-width: 480px) {
+  .er-fila { grid-template-columns: 24px minmax(0, 1fr) 40px; }
+  .er-fila .er-opcional { grid-column: 2 / 3; grid-row: 2; padding-bottom: .5rem; }
+  .er-fila .er-menu { grid-column: 3; grid-row: 1 / 3; }
+}

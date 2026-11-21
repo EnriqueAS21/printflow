@@ -10,9 +10,12 @@ from config import db
 from modelos.bitacora import registrar
 from modelos.cliente import Cliente
 from modelos.envios import MENSAJE_DUPLICADO, reclamar_envio
+from modelos.produccion import Proceso, ProductoPaso
 from modelos.producto import FORMAS, ListaPrecio, Presentacion, PresentacionPrecio, Producto
 from servicios.cotizador import cotizar
+from servicios import ruta_producto
 from servicios.permisos import permiso_requerido
+from servicios.rutas_produccion import invalidar as invalidar_rutas
 from servicios.textos import nombre_normalizado, normalizar_busqueda
 
 productos_bp = Blueprint('productos', __name__)
@@ -62,6 +65,17 @@ def _formato_cotizacion(valor):
     return f"{Decimal(str(valor)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP):.2f}"
 
 
+def _resumen_ruta(producto):
+    pasos = sorted(producto.rutas_produccion, key=lambda p: p.orden)
+    if pasos:
+        return ' → '.join(
+            f"{p.proceso.nombre}{'*' if p.opcional else ''}" for p in pasos
+        )
+    if producto.proceso_principal is not None:
+        return f"Principal: {producto.proceso_principal.nombre}"
+    return ''
+
+
 @productos_bp.route('/')
 @permiso_requerido('productos.ver')
 def lista():
@@ -71,9 +85,15 @@ def lista():
     if estado not in ('activos', 'inactivos', 'todos'):
         estado = 'activos'
 
+    ruta = 'sin' if request.args.get('ruta') == 'sin' else ''
+
     consulta = Producto.query.options(
-        selectinload(Producto.presentaciones).selectinload(Presentacion.precios)
+        selectinload(Producto.presentaciones).selectinload(Presentacion.precios),
+        selectinload(Producto.rutas_produccion).selectinload(ProductoPaso.proceso),
+        selectinload(Producto.proceso_principal),
     )
+    if ruta == 'sin':
+        consulta = consulta.filter(ruta_producto.condicion_sin_ruta())
     if estado == 'activos':
         consulta = consulta.filter(Producto.activo.is_(True))
     elif estado == 'inactivos':
@@ -119,6 +139,7 @@ def lista():
             'producto': producto,
             'presentaciones': presentaciones,
             'desde': min(precios) if precios else None,
+            'ruta': _resumen_ruta(producto),
         })
 
     categorias = [
@@ -128,7 +149,7 @@ def lista():
     ]
     return render_template(
         'productos/lista.html', filas=filas, q=q, categoria=categoria,
-        categorias=categorias, estado=estado, pagina=pagina,
+        categorias=categorias, estado=estado, ruta=ruta, pagina=pagina,
         paginas=paginas, total=total,
     )
 
@@ -527,13 +548,29 @@ def _datos_presentacion(presentacion):
 
 def _datos_producto(producto=None):
     if producto is None:
-        return {'nombre': '', 'categoria': '', 'descripcion': '', 'cobro_rollo': 'm2_real', 'presentaciones': []}
+        return {
+            'nombre': '', 'categoria': '', 'descripcion': '', 'cobro_rollo': 'm2_real',
+            'presentaciones': [], 'ruta': {'pasos': [], 'id_proceso_principal': None},
+        }
     return {
         'nombre': producto.nombre,
         'categoria': producto.categoria or '',
         'descripcion': producto.descripcion or '',
         'cobro_rollo': producto.cobro_rollo or 'm2_real',
         'presentaciones': [_datos_presentacion(p) for p in producto.presentaciones if p.activo],
+        'ruta': _datos_ruta(producto),
+    }
+
+
+def _datos_ruta(producto):
+    ruta = ruta_producto.ruta_de(producto)
+    nombres = {p.id_proceso: p for p in Proceso.query.all()}
+    return {
+        'pasos': [
+            {'id_proceso': i, 'opcional': o}
+            for i, o in ruta['pasos'] if i in nombres
+        ],
+        'id_proceso_principal': ruta['id_proceso_principal'],
     }
 
 
@@ -557,6 +594,11 @@ def _contexto_formulario(producto=None, datos=None, error=None):
             for lista in listas_activas
         ],
         'categorias': categorias,
+        'procesos': [
+            {'id_proceso': p.id_proceso, 'nombre': p.nombre, 'activo': bool(p.activo)}
+            for p in Proceso.query.filter(Proceso.es_sistema.is_(False))
+            .order_by(Proceso.orden, Proceso.nombre, Proceso.id_proceso).all()
+        ],
         'error': error,
     }
 
@@ -578,6 +620,9 @@ def _validar_datos_producto(datos):
         errores.append('La descripción no es válida.')
     if datos.get('cobro_rollo', 'm2_real') not in ('m2_real', 'ancho_rollo'):
         errores.append('El tipo de cobro de rollo no es válido.')
+
+    if 'ruta' in datos:
+        errores.extend(ruta_producto.validar_ruta(datos['ruta'])[1])
 
     presentaciones = datos.get('presentaciones')
     if not isinstance(presentaciones, list) or not presentaciones:
@@ -727,6 +772,16 @@ def _guardar_producto(producto, datos):
     producto.cobro_rollo = datos.get('cobro_rollo', 'm2_real')
     db.session.flush()
 
+    cambio_ruta = None
+    if 'ruta' in datos:
+        ruta, _errores = ruta_producto.validar_ruta(datos['ruta'])
+        nombres = {p.id_proceso: p.nombre for p in Proceso.query.all()}
+        antes = ruta_producto.ruta_de(producto)
+        if ruta_producto.guardar_ruta(producto, ruta):
+            cambio_ruta = (
+                f"{_describir_ruta(antes, nombres)} → {_describir_ruta(ruta, nombres)}"
+            )
+
     existentes = {p.id_presentacion: p for p in producto.presentaciones}
     recibidos = set()
     cambios_precios = []
@@ -782,7 +837,15 @@ def _guardar_producto(producto, datos):
             presentacion.activo = False
         else:
             db.session.delete(presentacion)
-    return producto, cambios_precios
+    return producto, cambios_precios, cambio_ruta
+
+
+def _describir_ruta(ruta, nombres):
+    pasos = ' > '.join(
+        f"{nombres.get(i, i)}{'*' if o else ''}" for i, o in ruta['pasos']
+    ) or 'sin pasos'
+    principal = nombres.get(ruta['id_proceso_principal'])
+    return f"{pasos}" + (f" (principal: {principal})" if principal else '')
 
 
 def _describir_precios(precios):
@@ -815,7 +878,7 @@ def _procesar_formulario(producto=None):
             )), 400
 
     try:
-        producto, cambios_precios = _guardar_producto(producto, datos)
+        producto, cambios_precios, cambio_ruta = _guardar_producto(producto, datos)
         if producto.id_producto:
             db.session.flush()
         if producto.id_producto and request.method == 'POST':
@@ -826,9 +889,12 @@ def _procesar_formulario(producto=None):
                 detalle=(
                     f"Producto {producto.clave} ({producto.nombre}) guardado."
                     + (f" Cambios de precios: {' | '.join(cambios_precios)}" if cambios_precios else '')
+                    + (f" Ruta de producción: {cambio_ruta}." if cambio_ruta else '')
                 ),
             )
         db.session.commit()
+        if cambio_ruta:
+            invalidar_rutas()
     except Exception as exc:
         db.session.rollback()
         if isinstance(exc, ValueError):
@@ -841,6 +907,66 @@ def _procesar_formulario(producto=None):
         )), 400
     flash(f"Producto {producto.clave} {'actualizado' if es_edicion else 'guardado'}.", 'success')
     return redirect(url_for('productos.lista'))
+
+
+@productos_bp.route('/<int:id_producto>/ruta')
+@permiso_requerido('productos.administrar')
+def ruta_guardada(id_producto):
+    """Ruta de un producto, para copiarla en el editor (solo procesos activos)."""
+    producto = db.session.get(Producto, id_producto)
+    if producto is None:
+        return jsonify({'error': 'El producto no existe.'}), 404
+    ruta = ruta_producto.ruta_de(producto)
+    procesos = {p.id_proceso: p for p in Proceso.query.all()}
+    validos = [
+        (i, o) for i, o in ruta['pasos']
+        if i in procesos and procesos[i].activo and not procesos[i].es_sistema
+    ]
+    principal = ruta['id_proceso_principal']
+    principal_valido = principal if principal in procesos and procesos[principal].activo else None
+    return jsonify({
+        'nombre': producto.nombre,
+        'pasos': [{'id_proceso': i, 'opcional': o} for i, o in validos],
+        'id_proceso_principal': principal_valido,
+        'omitidos': len(ruta['pasos']) - len(validos) + (1 if principal and not principal_valido else 0),
+    })
+
+
+@productos_bp.route('/<int:id_producto>/aplicar-ruta', methods=['GET', 'POST'])
+@permiso_requerido('productos.administrar')
+def aplicar_ruta_categoria(id_producto):
+    """GET: conteos de la categoría. POST {modo}: copia la ruta guardada a la categoría."""
+    producto = db.session.get(Producto, id_producto)
+    if producto is None:
+        return jsonify({'error': 'El producto no existe.'}), 404
+    if request.method == 'GET':
+        return jsonify(ruta_producto.contar_categoria(producto))
+
+    datos = request.get_json(silent=True)
+    modo = datos.get('modo') if isinstance(datos, dict) else None
+    try:
+        resultado = ruta_producto.aplicar_a_categoria(producto, modo)
+        registrar(
+            'PRODUCTO_RUTA_CATEGORIA',
+            entidad='Producto',
+            id_entidad=producto.id_producto,
+            detalle=(
+                f"Ruta de {producto.clave} ({producto.nombre}) aplicada a la categoría "
+                f"{resultado['categoria']} ({'solo sin ruta' if modo == 'sin_ruta' else 'sobrescribir todas'}): "
+                f"{resultado['aplicados']} de {resultado['total']} productos "
+                f"({resultado['sin_ruta']} sin ruta)."
+            ),
+        )
+        db.session.commit()
+    except ValueError as exc:
+        db.session.rollback()
+        return jsonify({'error': str(exc)}), 400
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception('Error al aplicar ruta a la categoría')
+        return jsonify({'error': 'No se pudo aplicar la ruta.'}), 500
+    invalidar_rutas()
+    return jsonify(resultado)
 
 
 @productos_bp.route('/nuevo', methods=['GET', 'POST'])

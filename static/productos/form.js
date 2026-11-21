@@ -388,6 +388,104 @@
         });
     }
 
+    // ── Ruta de producción ──────────────────────────────────────────────
+    const seccionRuta = document.getElementById('seccionRuta');
+    const rutaGuardadaJson = JSON.stringify(inicial.ruta || { pasos: [], id_proceso_principal: null });
+    const botonAplicar = document.getElementById('aplicarRutaCategoria');
+    const estadoAplicar = document.getElementById('aplicarRutaEstado');
+    const cabecerasAjax = { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' };
+
+    function actualizarAplicar() {
+        if (!botonAplicar) return;
+        const cambiada = JSON.stringify(editorRuta.obtener()) !== rutaGuardadaJson;
+        botonAplicar.disabled = cambiada;
+        estadoAplicar.textContent = cambiada ? 'Hay cambios en la ruta sin guardar: guarda el producto para aplicarla.' : '';
+        estadoAplicar.className = 'small mt-2 text-muted';
+    }
+
+    const editorRuta = EditorRuta.crear(document.getElementById('editorRuta'), {
+        procesos: JSON.parse(seccionRuta.dataset.procesos || '[]'),
+        datos: inicial.ruta,
+        maxPasos: 8,
+        alCambiar: actualizarAplicar,
+    });
+    actualizarAplicar();
+
+    const buscarCopia = document.getElementById('copiarRutaBuscar');
+    const resultadosCopia = document.getElementById('copiarRutaResultados');
+    const estadoCopia = document.getElementById('copiarRutaEstado');
+    let temporizadorCopia = null;
+    let consultaCopia = 0;
+
+    async function buscarProductosCopia() {
+        const q = buscarCopia.value.trim();
+        const id = ++consultaCopia;
+        if (q.length < 2) { resultadosCopia.classList.add('d-none'); return; }
+        try {
+            const respuesta = await fetch(`${seccionRuta.dataset.urlBuscar}?q=${encodeURIComponent(q)}`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+            if (!respuesta.ok) throw new Error();
+            const productos = (await respuesta.json()).filter(p => String(p.id_producto) !== (seccionRuta.dataset.idProducto || ''));
+            if (id !== consultaCopia) return;
+            resultadosCopia.innerHTML = productos.length
+                ? productos.map(p => `<button type="button" class="list-group-item list-group-item-action" data-id="${escapar(p.id_producto)}">${escapar(p.clave)} · ${escapar(p.nombre)}</button>`).join('')
+                : '<div class="list-group-item text-muted small">Sin resultados</div>';
+            resultadosCopia.classList.remove('d-none');
+        } catch {
+            estadoCopia.textContent = 'No se pudo buscar productos.';
+        }
+    }
+    buscarCopia.addEventListener('input', () => {
+        clearTimeout(temporizadorCopia);
+        temporizadorCopia = setTimeout(buscarProductosCopia, 250);
+    });
+    buscarCopia.addEventListener('keydown', evento => { if (evento.key === 'Enter') evento.preventDefault(); });
+    resultadosCopia.addEventListener('click', async evento => {
+        const boton = evento.target.closest('button[data-id]');
+        if (!boton) return;
+        resultadosCopia.classList.add('d-none');
+        try {
+            const url = seccionRuta.dataset.urlRuta.replace(/\/0\/ruta$/, `/${boton.dataset.id}/ruta`);
+            const respuesta = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+            const datos = await respuesta.json();
+            if (!respuesta.ok) throw new Error(datos.error || 'No se pudo copiar la ruta.');
+            editorRuta.establecer(datos);
+            actualizarAplicar();
+            buscarCopia.value = '';
+            estadoCopia.textContent = `Ruta copiada de «${datos.nombre}». Pulsa Guardar para conservarla.`
+                + (datos.omitidos ? ` Se omitieron ${datos.omitidos} proceso(s) inactivo(s).` : '');
+        } catch (error) {
+            estadoCopia.textContent = error.message;
+        }
+    });
+
+    if (botonAplicar) {
+        botonAplicar.addEventListener('click', async () => {
+            const modo = document.querySelector('input[name="modoAplicar"]:checked').value;
+            const mostrar = (texto, error) => { estadoAplicar.textContent = texto; estadoAplicar.className = `small mt-2 ${error ? 'text-danger' : 'text-success'}`; };
+            botonAplicar.disabled = true;
+            try {
+                const resConteo = await fetch(seccionRuta.dataset.urlAplicar, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                const conteo = await resConteo.json();
+                if (!resConteo.ok) throw new Error(conteo.error || 'No se pudo calcular el conteo.');
+                const destino = modo === 'sin_ruta' ? conteo.sin_ruta : conteo.total;
+                const resumen = `${conteo.sin_ruta} sin ruta · ${conteo.total} en total`;
+                if (!destino) { mostrar(`No hay productos que actualizar en «${conteo.categoria}» (${resumen}).`, true); return; }
+                const texto = modo === 'sin_ruta'
+                    ? `Se copiará la ruta a ${destino} producto(s) sin ruta de «${conteo.categoria}» (${resumen}).`
+                    : `Se SOBRESCRIBIRÁ la ruta de ${destino} producto(s) de «${conteo.categoria}» (${resumen}).`;
+                if (!window.confirm(`${texto}\n\n¿Continuar?`)) return;
+                const respuesta = await fetch(seccionRuta.dataset.urlAplicar, { method: 'POST', headers: cabecerasAjax, body: JSON.stringify({ modo }) });
+                const resultado = await respuesta.json();
+                if (!respuesta.ok) throw new Error(resultado.error || 'No se pudo aplicar la ruta.');
+                mostrar(`Ruta aplicada a ${resultado.aplicados} producto(s) de «${resultado.categoria}».`, false);
+            } catch (error) {
+                mostrar(error.message, true);
+            } finally {
+                botonAplicar.disabled = JSON.stringify(editorRuta.obtener()) !== rutaGuardadaJson;
+            }
+        });
+    }
+
     function actualizarCobroRollo() {
         const tieneRollo = [...contenedor.querySelectorAll('.forma-presentacion')].some(select => select.value === 'rollo');
         document.getElementById('configCobroRollo').classList.toggle('d-none', !tieneRollo);
@@ -399,6 +497,7 @@
             categoria: document.getElementById('categoriaProducto').value.trim(),
             descripcion: document.getElementById('descripcionProducto').value.trim(),
             cobro_rollo: document.getElementById('cobroRollo').value,
+            ruta: editorRuta.obtener(),
             presentaciones: [...contenedor.querySelectorAll('.presentacion-card')].map(tarjeta => {
                 const forma = tarjeta.querySelector('.forma-presentacion').value;
                 const precios = [];
@@ -444,6 +543,7 @@
         const tarjetasConError = new Set();
         if (!datos.nombre) errores.push('El nombre del producto es obligatorio.');
         if (!datos.presentaciones.length) errores.push('Agrega al menos una presentación.');
+        errores.push(...editorRuta.validar());
         datos.presentaciones.forEach((presentacion, indice) => {
             const tarjeta = contenedor.children[indice];
             const agregarError = mensaje => {

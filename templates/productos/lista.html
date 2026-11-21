@@ -17,7 +17,7 @@
 
     <div class="form-card">
         <form id="filtrosProductos" method="GET" action="{{ url_for('productos.lista') }}" class="row g-2 align-items-end">
-            <div class="col-md-6">
+            <div class="col-md-5">
                 <label for="buscarProducto" class="form-label small text-muted">Buscar</label>
                 <input type="search" id="buscarProducto" name="q" class="form-control" autocomplete="off"
                        placeholder="Buscar por nombre o clave" aria-label="Buscar productos" value="{{ q }}">
@@ -31,12 +31,19 @@
                     {% endfor %}
                 </select>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <label for="filtroEstado" class="form-label small text-muted">Estado</label>
                 <select id="filtroEstado" name="estado" class="form-select">
                     <option value="activos" {% if estado == 'activos' %}selected{% endif %}>Activos</option>
                     <option value="inactivos" {% if estado == 'inactivos' %}selected{% endif %}>Inactivos</option>
                     <option value="todos" {% if estado == 'todos' %}selected{% endif %}>Todos</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label for="filtroRuta" class="form-label small text-muted">Ruta</label>
+                <select id="filtroRuta" name="ruta" class="form-select">
+                    <option value="">Todas</option>
+                    <option value="sin" {% if ruta == 'sin' %}selected{% endif %}>Sin ruta</option>
                 </select>
             </div>
         </form>
@@ -52,6 +59,7 @@
                         <th>Nombre</th>
                         <th>Categoría</th>
                         <th>Presentaciones</th>
+                        <th>Ruta</th>
                         <th class="text-nowrap">Desde $</th>
                         <th>Estatus</th>
                         {% if puede('productos.administrar') %}<th></th>{% endif %}
@@ -65,6 +73,7 @@
                         <td class="fw-semibold">{{ producto.nombre }}</td>
                         <td>{{ producto.categoria or '' }}</td>
                         <td>{{ fila.presentaciones | map(attribute='nombre') | join(', ') }}</td>
+                        <td class="small">{% if fila.ruta %}{{ fila.ruta }}{% else %}<span class="badge text-bg-warning">Sin ruta</span>{% endif %}</td>
                         <td class="text-nowrap">{% if fila.desde is not none %}${{ '%.2f'|format(fila.desde) }}{% else %}—{% endif %}</td>
                         <td>
                             {% if producto.activo %}
@@ -86,7 +95,7 @@
                         {% endif %}
                     </tr>
                     {% else %}
-                    <tr><td colspan="{{ 7 if puede('productos.administrar') else 6 }}" class="text-center text-muted py-4">No hay productos que coincidan con los filtros.</td></tr>
+                    <tr><td colspan="{{ 8 if puede('productos.administrar') else 7 }}" class="text-center text-muted py-4">No hay productos que coincidan con los filtros.</td></tr>
                     {% endfor %}
                 </tbody>
             </table>
@@ -95,11 +104,11 @@
             {% if paginas > 1 %}
             <ul class="pagination justify-content-center mb-0">
                 <li class="page-item {% if pagina <= 1 %}disabled{% endif %}">
-                    <a class="page-link" href="{{ url_for('productos.lista', q=q, categoria=categoria, estado=estado, pagina=pagina-1) }}" aria-label="Anterior">Anterior</a>
+                    <a class="page-link" href="{{ url_for('productos.lista', q=q, categoria=categoria, estado=estado, ruta=ruta, pagina=pagina-1) }}" aria-label="Anterior">Anterior</a>
                 </li>
                 <li class="page-item disabled"><span class="page-link">{{ pagina }} / {{ paginas }}</span></li>
                 <li class="page-item {% if pagina >= paginas %}disabled{% endif %}">
-                    <a class="page-link" href="{{ url_for('productos.lista', q=q, categoria=categoria, estado=estado, pagina=pagina+1) }}" aria-label="Siguiente">Siguiente</a>
+                    <a class="page-link" href="{{ url_for('productos.lista', q=q, categoria=categoria, estado=estado, ruta=ruta, pagina=pagina+1) }}" aria-label="Siguiente">Siguiente</a>
                 </li>
             </ul>
             {% endif %}
