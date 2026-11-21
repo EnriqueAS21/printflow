@@ -428,6 +428,13 @@ class DetallePedido(db.Model):
         cascade="all, delete-orphan",
         lazy=True,
     )
+    pasos = db.relationship(
+        "LineaPaso",
+        back_populates="detalle",
+        lazy=True,
+        cascade="all, delete-orphan",
+        order_by="LineaPaso.orden",
+    )
 
 
 class DetalleAsignacion(db.Model):
@@ -443,13 +450,36 @@ class DetalleAsignacion(db.Model):
     id_usuario = db.Column(
         db.Integer,
         db.ForeignKey("usuarios.id_usuario", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
         index=True,
     )
     completado = db.Column(db.Boolean, nullable=False, default=False)
+    fecha_completado = db.Column(db.DateTime, nullable=True)
+    id_usuario_completo = db.Column(
+        db.Integer,
+        db.ForeignKey("usuarios.id_usuario", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    id_proceso_actual = db.Column(
+        db.Integer,
+        db.ForeignKey("procesos.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     detalle = db.relationship("DetallePedido", back_populates="asignacion")
-    usuario = db.relationship("Usuario", lazy=True)
+    usuario = db.relationship(
+        "Usuario",
+        foreign_keys=[id_usuario],
+        lazy=True,
+    )
+    usuario_completo = db.relationship(
+        "Usuario",
+        foreign_keys=[id_usuario_completo],
+        lazy=True,
+    )
+    proceso_actual = db.relationship("Proceso", foreign_keys=[id_proceso_actual], lazy=True)
 
 
 def con_relaciones_tarjeta(query):
@@ -498,3 +528,7 @@ class Pago(db.Model):
     @property
     def cobrado(self):
         return round(_a_float(self.monto) + _a_float(self.comision), 2)
+
+
+# Registra las tablas de rutas aunque este módulo se importe directamente en pruebas.
+from modelos import produccion as _modelo_produccion  # noqa: E402,F401

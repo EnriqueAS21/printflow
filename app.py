@@ -6,7 +6,7 @@ from flask import Flask, redirect, url_for
 from sqlalchemy import text
 
 from config import db
-from modelos import bitacora, caja, cliente, configuracion_nota, envios, notificacion, pedido, perfil_usuario, producto, usuario  # noqa: F401  # registran las tablas
+from modelos import bitacora, caja, cliente, configuracion_nota, envios, notificacion, pedido, perfil_usuario, producto, produccion, usuario  # noqa: F401  # registran las tablas
 from modelos.pedido import (
     REGIMENES_FISCALES, TASA_COMISION_TARJETA, TASA_IVA, USOS_CFDI,
 )

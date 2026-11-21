@@ -31,12 +31,23 @@ class Producto(db.Model):
     cobro_rollo = db.Column(db.String(20), default="m2_real")
     activo = db.Column(db.Boolean, default=True)
     fecha_alta = db.Column(db.DateTime, default=datetime.now)
+    id_proceso_principal = db.Column(
+        db.Integer,
+        db.ForeignKey("procesos.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     presentaciones = db.relationship(
         "Presentacion",
         back_populates="producto",
         order_by="Presentacion.orden",
         cascade="all, delete-orphan",
+    )
+    proceso_principal = db.relationship(
+        "Proceso",
+        foreign_keys=[id_proceso_principal],
+        lazy=True,
     )
 
     @validates("nombre")
@@ -120,3 +131,8 @@ class PresentacionPrecio(db.Model):
 
     presentacion = db.relationship("Presentacion", back_populates="precios")
     lista = db.relationship("ListaPrecio")
+
+
+# Registra las tablas de rutas antes de configurar relaciones/metadata en pruebas
+# que importan directamente este módulo.
+from modelos import produccion as _modelo_produccion  # noqa: E402,F401

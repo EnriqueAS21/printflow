@@ -87,9 +87,10 @@ def terminar_producto(id_pedido, id_detalle):
         return redirect(url_for('pedidos.ficha', folio=pedido.folio))
 
     asignacion.completado = True
+    nombre_responsable = asignacion.usuario.nombre if asignacion.usuario else 'Sin responsable'
     registrar(
         'PRODUCTO_TERMINADO', 'pedido', pedido.id_pedido,
-        f'{pedido.folio}: {detalle.descripcion} · {asignacion.usuario.nombre}',
+        f'{pedido.folio}: {detalle.descripcion} · {nombre_responsable}',
     )
     if pedido.tiene_asignaciones_por_producto and pedido.productos_completos:
         pedido.estatus = EstadoPedido.TERMINADO.value

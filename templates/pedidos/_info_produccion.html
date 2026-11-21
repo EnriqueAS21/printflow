@@ -128,7 +128,7 @@
           </div>
           {% if pedido.tiene_asignaciones_por_producto %}
             <span class="ip-producto-resp">
-              {%- if d.asignacion %}{{ d.asignacion.usuario.nombre }}
+              {%- if d.asignacion and d.asignacion.usuario %}{{ d.asignacion.usuario.nombre }}
                 {%- if d.asignacion.completado %} <i class="bi bi-check-circle-fill text-success" title="Terminado" aria-label="Terminado"></i>{% endif %}
               {%- else %}Sin responsable{% endif -%}
             </span>
@@ -144,7 +144,7 @@
             {% if d.asignacion %}
             <div class="d-flex justify-content-between align-items-center gap-2 mt-1">
               <span class="small text-muted">
-                <i class="bi bi-person me-1"></i>{{ d.asignacion.usuario.nombre }}
+                <i class="bi bi-person me-1"></i>{{ d.asignacion.usuario.nombre if d.asignacion.usuario else 'Sin responsable' }}
                 {% if d.asignacion.completado %}<i class="bi bi-check-circle-fill text-success ms-1" title="Terminado" aria-label="Terminado"></i>{% endif %}
               </span>
               {% if acciones_producto and not d.asignacion.completado and pedido.estatus == 'En proceso' and puede('dashboard.terminar') and (not solo_sus_pedidos() or d.asignacion.id_usuario == usuario_actual.id_usuario) %}
