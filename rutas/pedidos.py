@@ -16,7 +16,7 @@ from PIL import Image
 from werkzeug.utils import secure_filename
 
 from config import db
-from modelos.bitacora import registrar
+from modelos.bitacora import Bitacora, registrar
 from modelos.cajon import abrir_cajon_o_avisar
 from modelos.cliente import Cliente
 from modelos.envios import MENSAJE_DUPLICADO, reclamar_envio
@@ -33,7 +33,7 @@ from servicios.telefonos import normalizar_telefono
 from servicios.textos import normalizar_nombre
 from servicios.Etiquetas import _url_pedido, generar_qr_data_uri
 from modelos.caja import MovimientoCaja
-from modelos.configuracion_nota import ConfiguracionNota, obtener_configuracion_nota
+from modelos.configuracion_nota import ConfiguracionNota, apartados_para, obtener_configuracion_nota
 from servicios import Etiquetas as etiquetas
 
 from servicios.ColaImpresion import (
@@ -1036,6 +1036,48 @@ def ticket_pedido(id_pedido):
         'pedidos/ticket.html', pedido=pedido, ahora=datetime.now(),
         url_ficha=_url_pedido(pedido),
         qr_ficha=generar_qr_data_uri(_url_pedido(pedido)),
+    )
+
+
+@pedidos_bp.route('/<int:id_pedido>/ticket-entrega', methods=['GET'])
+@permiso_requerido('pedidos.imprimir')
+def ticket_entrega(id_pedido):
+    pedido = db.session.get(Pedido, id_pedido)
+    if pedido is None:
+        abort(404)
+    if pedido.estatus != EstadoPedido.ENTREGADO.value:
+        flash('El ticket de entrega solo se imprime para pedidos entregados.', 'danger')
+        return redirect(url_for('dashboard.index'))
+
+    registro_entrega = (
+        Bitacora.query
+        .filter(
+            Bitacora.accion == 'PEDIDO_ESTADO',
+            Bitacora.entidad == 'pedido',
+            Bitacora.id_entidad == pedido.id_pedido,
+            Bitacora.detalle.like('%: Entregado'),
+        )
+        .order_by(Bitacora.fecha.desc(), Bitacora.id_bitacora.desc())
+        .first()
+    )
+    entrego = (registro_entrega.nombre_usuario if registro_entrega else None) or '—'
+
+    configuracion = obtener_configuracion_nota()
+    politicas = [
+        linea.strip() for linea in (configuracion.politicas or '').splitlines() if linea.strip()
+    ]
+    pagos = sorted(
+        pedido.pagos or [],
+        key=lambda p: (p.fecha_pago or datetime.min, p.id_pago or 0),
+    )
+
+    registrar('PEDIDO_TICKET_ENTREGA', 'pedido', pedido.id_pedido,
+              f'{pedido.folio}: ticket de entrega')
+    db.session.commit()
+    return render_template(
+        'pedidos/ticket_entrega.html', pedido=pedido, configuracion=configuracion,
+        entrego=entrego, politicas=politicas, pagos=pagos,
+        apartados=apartados_para('ticket', pedido),
     )
 
 

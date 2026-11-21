@@ -2,7 +2,7 @@
 import re
 from datetime import datetime, timedelta
 
-from flask import Blueprint, current_app, flash, g, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, current_app, flash, g, jsonify, redirect, render_template, request, session, url_for
 from sqlalchemy import and_, case, func, or_
 from sqlalchemy.orm import selectinload
 
@@ -483,6 +483,12 @@ def cambiar_estado(pedido_id):
     registrar('PEDIDO_ESTADO', 'pedido', pedido.id_pedido, f'{pedido.folio}: {nuevo}')
     db.session.commit()
 
+    imprimir_entrega = nuevo == EstadoPedido.ENTREGADO.value and tiene_permiso('pedidos.imprimir')
     if ajax:
-        return jsonify({"success": True, "nuevo_estado": pedido.estatus, "pedido_id": pedido.id_pedido})
+        respuesta = {"success": True, "nuevo_estado": pedido.estatus, "pedido_id": pedido.id_pedido}
+        if imprimir_entrega:
+            respuesta["url_ticket_entrega"] = url_for('pedidos.ticket_entrega', id_pedido=pedido.id_pedido)
+        return jsonify(respuesta)
+    if imprimir_entrega:
+        session['imprimir_ticket_entrega'] = pedido.id_pedido
     return volver()

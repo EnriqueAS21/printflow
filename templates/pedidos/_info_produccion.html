@@ -47,18 +47,7 @@
   <div class="ip-sec ip-cliente-linea">
     <strong>{{ pedido.nombre_cliente }}</strong>{% if pedido.telefono_cliente %} · {% endif %}
     {% if pedido.whatsapp_url and not solo_lectura %}
-      {% if nota_whatsapp %}
-        {% set lineas = namespace(detalles=[]) %}
-        {% for d in pedido.detalles %}
-          {% set lineas.detalles = lineas.detalles + ['• ' ~ ('%g'|format(d.cantidad|float)) ~ 'x ' ~ d.descripcion] %}
-        {% endfor %}
-        {% set entrega_msg = 'ya fue entregado' if pedido.estatus == 'Entregado' else ('está listo para ser entregado' if pedido.estatus == 'Terminado' else 'está en proceso de elaboración') %}
-        {% set msg = 'Hola *' ~ pedido.nombre_cliente ~ '*, tu pedido con folio *' ~ pedido.folio ~ '* ' ~ entrega_msg ~ '.' ~ '\n\n*Detalles:*\n' ~ (lineas.detalles|join('\n') if lineas.detalles else '• Detalles registrados en la nota') ~ '\n\n*Total a liquidar:* $' ~ ('%.2f'|format(pedido.saldo_restante)) %}
-        {% set apartados_msg = pedido.texto_apartados_whatsapp %}
-        {% if apartados_msg %}{% set msg = msg ~ '\n\n' ~ apartados_msg %}{% endif %}
-      {% else %}
-        {% set msg = 'Hola, te escribo de ' ~ config.get('NOMBRE_CLIENTE', 'Área Creativa') ~ ' sobre tu pedido ' ~ pedido.folio %}
-      {% endif %}
+      {% set msg = pedido.mensaje_whatsapp if nota_whatsapp else pedido.mensaje_whatsapp_simple %}
       <a href="{{ pedido.whatsapp_url }}?text={{ msg|urlencode }}" target="_blank" rel="noopener noreferrer"
          class="btn-whatsapp" title="Abrir chat de WhatsApp{% if nota_whatsapp %} y copiar nota PNG{% endif %}"
          {% if nota_whatsapp %}data-png-url="{{ url_for('pedidos.descargar_ticket_png', id_pedido=pedido.id_pedido) }}" onclick="abrirWhatsAppYCopiarNota(this)"{% endif %}>
@@ -80,18 +69,7 @@
   <div class="ip-sec">
     <div class="ip-label">Contacto</div>
     {% if pedido.whatsapp_url and not solo_lectura %}
-      {% if nota_whatsapp %}
-        {% set lineas = namespace(detalles=[]) %}
-        {% for d in pedido.detalles %}
-          {% set lineas.detalles = lineas.detalles + ['• ' ~ ('%g'|format(d.cantidad|float)) ~ 'x ' ~ d.descripcion] %}
-        {% endfor %}
-        {% set entrega_msg = 'ya fue entregado' if pedido.estatus == 'Entregado' else ('está listo para ser entregado' if pedido.estatus == 'Terminado' else 'está en proceso de elaboración') %}
-        {% set msg = 'Hola *' ~ pedido.nombre_cliente ~ '*, tu pedido con folio *' ~ pedido.folio ~ '* ' ~ entrega_msg ~ '.' ~ '\n\n*Detalles:*\n' ~ (lineas.detalles|join('\n') if lineas.detalles else '• Detalles registrados en la nota') ~ '\n\n*Total a liquidar:* $' ~ ('%.2f'|format(pedido.saldo_restante)) %}
-        {% set apartados_msg = pedido.texto_apartados_whatsapp %}
-        {% if apartados_msg %}{% set msg = msg ~ '\n\n' ~ apartados_msg %}{% endif %}
-      {% else %}
-        {% set msg = 'Hola, te escribo de ' ~ config.get('NOMBRE_CLIENTE', 'Área Creativa') ~ ' sobre tu pedido ' ~ pedido.folio %}
-      {% endif %}
+      {% set msg = pedido.mensaje_whatsapp if nota_whatsapp else pedido.mensaje_whatsapp_simple %}
       <a href="{{ pedido.whatsapp_url }}?text={{ msg|urlencode }}" target="_blank" rel="noopener noreferrer"
          class="btn-whatsapp" title="Abrir chat de WhatsApp{% if nota_whatsapp %} y copiar nota PNG{% endif %}"
          {% if nota_whatsapp %}data-png-url="{{ url_for('pedidos.descargar_ticket_png', id_pedido=pedido.id_pedido) }}" onclick="abrirWhatsAppYCopiarNota(this)"{% endif %}>

@@ -643,7 +643,10 @@
         return;
       }
       const datos = await respuesta.json().catch(() => ({}));
-      if (datos.success) forzadas.add(datos.pedido_id);   // está expandida, pero su dueño pidió moverla
+      if (datos.success) {
+        forzadas.add(datos.pedido_id);   // está expandida, pero su dueño pidió moverla
+        if (datos.url_ticket_entrega && window.imprimirTicket) window.imprimirTicket(datos.url_ticket_entrega);
+      }
       else mostrarToastError(datos.error || ERROR_CAMBIO_ESTADO);
     } catch (error) {
       mostrarToastError(ERROR_CAMBIO_ESTADO);

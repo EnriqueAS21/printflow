@@ -11,6 +11,7 @@ class MovimientoCaja(db.Model):
     descripcion = db.Column(db.String(255), nullable=False)
     monto = db.Column(db.Numeric(10, 2), nullable=False)
     metodo_pago = db.Column(db.String(50), nullable=False)
+    comision = db.Column(db.Numeric(10, 2), nullable=False, default=0)  # solo ventas con tarjeta
     fecha = db.Column(db.DateTime, default=datetime.now, index=True)
     folio = db.Column(db.String(20), nullable=True, index=True)
 

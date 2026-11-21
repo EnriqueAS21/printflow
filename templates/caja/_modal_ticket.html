@@ -61,7 +61,7 @@
         <h5 class="fw-bold mb-3">Agregar pago</h5>
         <div class="row g-2 mb-3">
           <div class="col-md-6">
-            <select name="metodo_pago" class="form-select figma-input" required>
+            <select name="metodo_pago" class="form-select figma-input" required onchange="calcularTotalTicket()">
               <option value="Efectivo">Efectivo</option>
               <option value="Tarjeta">Tarjeta</option>
               <option value="Transferencia">Transferencia</option>
@@ -70,6 +70,11 @@
           <div class="col-md-6">
             <input type="text" id="ticket-total-display" class="form-control figma-input fw-bold text-dark" placeholder="Cantidad: $0.00" readonly value="$0.00">
           </div>
+        </div>
+        <div class="small text-primary mb-3 resumen-comision-ticket d-none" id="ticket-resumen-comision"
+             data-tasa-comision="{{ TASA_COMISION_TARJETA }}" aria-live="polite">
+          Comisión {{ (TASA_COMISION_TARJETA * 100)|round|int }}%: <strong class="comision-display">$0.00</strong>
+          · Cobrar en terminal: <strong class="cobro-terminal-display">$0.00</strong>
         </div>
         <div class="figma-banner-blue mb-4">
           <span>{{ fecha_larga }}</span>
@@ -232,7 +237,21 @@
     });
     const displayInput = document.getElementById('ticket-total-display');
     if (displayInput) displayInput.value = '$' + total.toFixed(2);
-    return Math.round((total + Number.EPSILON) * 100) / 100;
+    const totalRedondeado = Math.round((total + Number.EPSILON) * 100) / 100;
+
+    // Solo informativo: la comisión se calcula y guarda en el servidor.
+    const resumenComision = document.getElementById('ticket-resumen-comision');
+    if (resumenComision) {
+      const conTarjeta = document.querySelector('#modalTicket [name="metodo_pago"]')?.value === 'Tarjeta';
+      resumenComision.classList.toggle('d-none', !(conTarjeta && totalRedondeado > 0));
+      if (conTarjeta && totalRedondeado > 0) {
+        const tasa = parseFloat(resumenComision.dataset.tasaComision) || 0;
+        const comision = Math.round((totalRedondeado * tasa + Number.EPSILON) * 100) / 100;
+        resumenComision.querySelector('.comision-display').textContent = '$' + comision.toFixed(2);
+        resumenComision.querySelector('.cobro-terminal-display').textContent = '$' + (totalRedondeado + comision).toFixed(2);
+      }
+    }
+    return totalRedondeado;
   }
 
   function agregarFilaTicket() {

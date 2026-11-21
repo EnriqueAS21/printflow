@@ -38,6 +38,8 @@ MESES = [
     'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
 ]
 
+DIAS_SEMANA = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo']
+
 
 def _a_float(valor):
     """Convierte Decimal/str/None a float de forma segura."""
@@ -180,6 +182,94 @@ class Pedido(db.Model):
         """Apartados configurados para el mensaje de WhatsApp de este pedido."""
         from modelos.configuracion_nota import texto_apartados_whatsapp
         return texto_apartados_whatsapp(self)
+
+    @staticmethod
+    def _moneda(valor):
+        return f"${_a_float(valor):,.2f}"
+
+    @staticmethod
+    def _fecha_corta(fecha):
+        return f"{fecha.day:02d}/{fecha.month:02d}/{fecha.year}"
+
+    @staticmethod
+    def _fecha_con_dia_y_hora(fecha):
+        hora = fecha.hour % 12 or 12
+        sufijo = "AM" if fecha.hour < 12 else "PM"
+        return (f"{DIAS_SEMANA[fecha.weekday()]} {Pedido._fecha_corta(fecha)}, "
+                f"{hora}:{fecha.minute:02d} {sufijo}")
+
+    def _lineas_whatsapp(self):
+        if not self.detalles:
+            return "• Detalles registrados en la nota"
+        return "\n".join(
+            f"• {_a_float(d.cantidad):g}x {d.descripcion}" for d in self.detalles
+        )
+
+    @property
+    def mensaje_whatsapp(self):
+        """Mensaje de WhatsApp según el estatus; los datos del negocio salen de configuracion_nota."""
+        from modelos.configuracion_nota import obtener_configuracion_nota
+        configuracion = obtener_configuracion_nota()
+        negocio = (configuracion.nombre_negocio or "").strip()
+        direccion = (configuracion.direccion or "").strip()
+        telefono = (configuracion.telefono or "").strip()
+        cliente = self.nombre_cliente
+        saldo = self.saldo_restante
+        pagado_txt = "*Pagado:* ✔ No tienes saldo pendiente."
+
+        if self.estatus == EstadoPedido.EN_PROCESO.value:
+            partes = [
+                f"Hola *{cliente}* 👋\nTe escribimos de *{negocio}*. Recibimos tu pedido:",
+            ]
+            datos = [f"*Folio:* {self.folio}"]
+            if self.fecha_entrega:
+                datos.append(f"*Entrega:* {self._fecha_con_dia_y_hora(self.fecha_entrega)}")
+            partes.append("\n".join(datos))
+            partes.append(f"*Detalles:*\n{self._lineas_whatsapp()}")
+            montos = [f"*Total:* {self._moneda(self.total)}"]
+            if saldo > 0:
+                if self.total_pagado > 0:
+                    montos.append(f"*Anticipo:* {self._moneda(self.total_pagado)}")
+                montos.append(f"*Resta:* {self._moneda(saldo)}")
+            else:
+                montos.append(pagado_txt)
+            partes.append("\n".join(montos))
+            partes.append("Te avisamos por aquí cuando esté listo.")
+        elif self.estatus == EstadoPedido.TERMINADO.value:
+            partes = [
+                f"Hola *{cliente}* 👋\n¡Tu pedido *{self.folio}* ya está listo para recoger! ✅",
+                f"*Detalles:*\n{self._lineas_whatsapp()}",
+                f"*Por liquidar al recoger:* {self._moneda(saldo)}" if saldo > 0 else pagado_txt,
+            ]
+            contacto = []
+            if direccion:
+                contacto.append(f"📍 {direccion}")
+            if telefono:
+                contacto.append(f"📞 {telefono}")
+            if contacto:
+                partes.append("\n".join(contacto))
+        elif self.estatus == EstadoPedido.ENTREGADO.value:
+            entrega = (f"fue entregado el {self._fecha_corta(self.fecha_entregado)}."
+                       if self.fecha_entregado else "fue entregado.")
+            partes = [
+                f"Hola *{cliente}*, gracias por tu compra 🙌\nTu pedido *{self.folio}* {entrega}",
+                "Cualquier duda, aquí estamos.\n"
+                + (f"*{negocio}* · {telefono}" if telefono else f"*{negocio}*"),
+            ]
+        else:
+            return self.mensaje_whatsapp_simple
+
+        mensaje = "\n\n".join(partes)
+        apartados = self.texto_apartados_whatsapp
+        if apartados:
+            mensaje += "\n\n" + apartados
+        return mensaje
+
+    @property
+    def mensaje_whatsapp_simple(self):
+        from modelos.configuracion_nota import obtener_configuracion_nota
+        negocio = (obtener_configuracion_nota().nombre_negocio or "").strip()
+        return f"Hola *{self.nombre_cliente}*, te escribimos de *{negocio}* sobre tu pedido *{self.folio}*."
 
     @property
     def hora_creacion(self):

@@ -727,21 +727,6 @@
 <script src="{{ url_for('static', filename='js/tablero_sync.js') }}" data-url-cambios="{{ url_for('dashboard.cambios') }}" data-url-entregados="{{ url_for('dashboard.entregados') }}"></script>
 <script>
   // Filtros y Buscador del Tablero
-  function imprimirTicket(url) {
-    let f = document.getElementById('frame-ticket');
-    if (!f) {
-      f = document.createElement('iframe');
-      f.id = 'frame-ticket';
-      f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
-      document.body.appendChild(f);
-    }
-    f.onload = () => {
-      if (f.contentWindow.location.href === 'about:blank') return;
-      f.contentWindow.focus();
-      f.contentWindow.print();
-    };
-    f.src = url;
-  }
 
   // Edición bajo demanda: el formulario se pide al presionar "Editar" y usa un solo modal.
   (function () {
@@ -846,6 +831,8 @@
         panel.hidden = true;
         panel.classList.remove('abierto');
         panel.querySelector('[data-pago-error]').hidden = true;
+        const bloqueComision = panel.querySelector('[data-pago-comision]');
+        if (bloqueComision) bloqueComision.hidden = true;
         card.querySelector('[data-pago-abrir]')?.classList.remove('activo');
         card.querySelector('[data-pago-abrir]')?.setAttribute('aria-expanded', 'false');
         delete panel.dataset.tokenEnvio;
@@ -864,6 +851,19 @@
         panel.querySelector('[data-pago-resumen]').innerHTML = excedido
           ? `Este pago <strong>$${pago.toFixed(2)}</strong> · <strong class="pedido-pago-maximo">Máximo $${saldo.toFixed(2)}</strong>`
           : `Este pago <strong>$${pago.toFixed(2)}</strong> · Resta <strong class="pedido-pago-resta">$${(saldo - pago).toFixed(2)}</strong>`;
+
+        // La comisión solo se muestra: el saldo y "Guardar cobro" siguen usando el monto sin comisión.
+        const bloqueComision = panel.querySelector('[data-pago-comision]');
+        if (bloqueComision) {
+          const conTarjeta = panel.querySelector('[data-pago-metodo]').value === 'Tarjeta';
+          bloqueComision.hidden = !(conTarjeta && pagoValido);
+          if (!bloqueComision.hidden) {
+            const tasa = parseFloat(panel.dataset.tasaComision) || 0;
+            const comision = Math.round((monto * tasa + Number.EPSILON) * 100) / 100;   // igual que formulario_pedido.js
+            bloqueComision.querySelector('[data-comision]').textContent = '$' + comision.toFixed(2);
+            bloqueComision.querySelector('[data-cobro-terminal]').textContent = '$' + (monto + comision).toFixed(2);
+          }
+        }
       }
 
       function limpiarMontoPago(campo) {
@@ -1043,6 +1043,7 @@
             opcion.classList.toggle('active', seleccionado);
             opcion.setAttribute('aria-pressed', String(seleccionado));
           });
+          actualizarResumenPago(panel);
           return;
         }
 

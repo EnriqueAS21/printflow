@@ -298,6 +298,79 @@ class CajaRoutesTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("Producción de prueba".encode(), response.data)
 
+    # ------------------------------------------------------------ comisión de mostrador
+    ITEMS_REDONDEO = (("1", "10.01", "Cuaderno"), ("1", "20.03", "Lápices"), ("1", "33.33", "Tijeras"))
+
+    def _post_ticket(self, metodo, items=None, token="a"):
+        items = items or self.ITEMS_REDONDEO
+        datos = MultiDict([("metodo_pago", metodo), ("token_envio", (token * 32)[:32])])
+        for cantidad, precio, descripcion in items:
+            datos.add("cantidad[]", cantidad)
+            datos.add("precio_unitario[]", precio)
+            datos.add("descripcion[]", descripcion)
+        with patch("rutas.caja.abrir_cajon_o_avisar", return_value=True):
+            return self.client.post("/caja/ticket", data=datos, headers={"X-Requested-With": "XMLHttpRequest"})
+
+    def test_ticket_con_tarjeta_guarda_comision_y_cuadra_al_centavo(self):
+        respuesta = self._post_ticket("Tarjeta").get_json()
+        total = round(10.01 + 20.03 + 33.33, 2)
+        esperada = round(total * TASA_COMISION_TARJETA, 2)
+        self.assertTrue(respuesta["success"])
+        self.assertEqual(respuesta["comision"], esperada)
+        self.assertEqual(respuesta["total_cobrado"], round(total + esperada, 2))
+        comisiones = [float(m.comision) for m in
+                      MovimientoCaja.query.order_by(MovimientoCaja.id_movimiento).all()]
+        self.assertEqual(len(comisiones), 3)
+        self.assertEqual(round(sum(comisiones), 2), esperada)
+        # Las dos primeras son proporcionales (redondeadas); la última absorbe los centavos.
+        self.assertEqual(comisiones[0], round(esperada * 10.01 / total, 2))
+        self.assertEqual(comisiones[1], round(esperada * 20.03 / total, 2))
+        from modelos.bitacora import Bitacora
+        self.assertIn(f"comisión ${esperada:.2f}", Bitacora.query.filter_by(accion="CAJA_TICKET").one().detalle)
+
+    def test_ticket_con_efectivo_o_transferencia_no_lleva_comision(self):
+        for i, metodo in enumerate(("Efectivo", "Transferencia")):
+            respuesta = self._post_ticket(metodo, token=f"tok-{i}").get_json()
+            self.assertEqual(respuesta["comision"], 0)
+            self.assertEqual(respuesta["total_cobrado"], respuesta["total"])
+        self.assertTrue(all(float(m.comision) == 0 for m in MovimientoCaja.query.all()))
+
+    def test_resumen_periodo_incluye_comision_del_mostrador(self):
+        from rutas.caja import _resumen_periodo
+        self._post_ticket("Tarjeta")
+        total = round(10.01 + 20.03 + 33.33, 2)
+        esperada = round(total * TASA_COMISION_TARJETA, 2)
+        resumen = _resumen_periodo(None)
+        self.assertAlmostEqual(resumen["comision"], esperada, places=2)
+        self.assertAlmostEqual(resumen["cobrado"]["Tarjeta"], total + esperada, places=2)
+        self.assertAlmostEqual(resumen["ingresos"]["Tarjeta"], total, places=2)
+        self.assertAlmostEqual(sum(f["comision"] for f in resumen["historial"]), esperada, places=2)
+
+    def test_egresos_no_llevan_comision(self):
+        from rutas.caja import _resumen_periodo
+        db.session.add(MovimientoCaja(tipo="EGRESO", cantidad=1, descripcion="Gasto", monto=50,
+                                      metodo_pago="Tarjeta", comision=9, fecha=datetime.now()))
+        db.session.commit()
+        resumen = _resumen_periodo(None)
+        self.assertEqual(resumen["comision"], 0)
+        self.assertEqual(resumen["cobrado"]["Tarjeta"], 0)
+
+    def test_ticket_impreso_muestra_total_cobrado_solo_con_tarjeta(self):
+        con_tarjeta = self._post_ticket("Tarjeta", token="a").get_json()
+        con_efectivo = self._post_ticket("Efectivo", token="b").get_json()
+        html = self.client.get(con_tarjeta["print_url"]).get_data(as_text=True)
+        self.assertIn("TOTAL COBRADO", html)
+        self.assertIn("Comisión tarjeta", html)
+        self.assertIn(f"${con_tarjeta['total_cobrado']:.2f}", html)
+        html = self.client.get(con_efectivo["print_url"]).get_data(as_text=True)
+        self.assertNotIn("TOTAL COBRADO", html)
+        self.assertNotIn("Comisión tarjeta", html)
+
+    def test_modal_de_ticket_trae_bloque_de_comision_oculto(self):
+        html = self.client.get("/caja/").get_data(as_text=True)
+        self.assertIn(f'id="ticket-resumen-comision"', html)
+        self.assertIn(f'data-tasa-comision="{TASA_COMISION_TARJETA}"', html)
+
     def test_sin_sesion_redirige_al_login(self):
         self._cerrar_sesion()
 

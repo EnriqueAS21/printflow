@@ -184,6 +184,10 @@ body {
 
     <hr class="sep">
     <div class="fila total"><span>TOTAL</span><span>${{ '%.2f'|format(total) }}</span></div>
+    {% if comision > 0 %}
+    <div class="fila"><span>Comisión tarjeta</span><span>${{ '%.2f'|format(comision) }}</span></div>
+    <div class="fila total"><span>TOTAL COBRADO</span><span>${{ '%.2f'|format(total + comision) }}</span></div>
+    {% endif %}
     <hr class="sep">
     <div class="centro">¡Gracias por su compra!</div>
     <div class="centro chico">Atendió: {{ atendio.nombre if atendio else '—' }}</div>

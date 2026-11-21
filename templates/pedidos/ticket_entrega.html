@@ -1,0 +1,307 @@
+{% macro monto(valor) %}${{ '{:,.2f}'.format(valor|float) }}{% endmacro %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Comprobante de entrega {{ pedido.folio }}</title>
+
+    <style>
+
+:root {
+    --ancho-ticket: 48mm;
+}
+
+@page {
+    size: 58mm auto;
+    margin: 0;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    width: 58mm;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff;
+    color: #000;
+    font-family: "Courier New", Courier, monospace;
+    font-size: 11px;
+    line-height: 1.25;
+}
+
+body {
+    overflow-x: hidden;
+}
+
+.ticket {
+    width: var(--ancho-ticket);
+    max-width: var(--ancho-ticket);
+    margin: 0 auto;
+    padding: 0;
+    background: #fff;
+    overflow-wrap: anywhere;
+}
+
+.centro {
+    text-align: center;
+}
+
+.negocio {
+    font-size: 14px;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+
+.folio {
+    margin: 3px 0;
+    font-size: 17px;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+
+.sep {
+    border: 0;
+    border-top: 1px dashed #000;
+    margin: 5px 0;
+    width: 100%;
+}
+
+.fila {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 3px;
+    width: 100%;
+}
+
+.fila > * {
+    min-width: 0;
+}
+
+.fila > :first-child {
+    flex: 1;
+}
+
+.fila > :last-child {
+    text-align: right;
+    overflow-wrap: anywhere;
+}
+
+.item {
+    margin-bottom: 5px;
+    break-inside: avoid;
+    page-break-inside: avoid;
+}
+
+.desc {
+    overflow-wrap: anywhere;
+    word-break: normal;
+}
+
+.total {
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.chico {
+    font-size: 10px;
+}
+
+.qr-ficha {
+    margin: 8px auto 5px;
+    text-align: center;
+    break-inside: avoid;
+    page-break-inside: avoid;
+}
+
+.qr-ficha img {
+    display: block;
+    width: 28mm;
+    height: 28mm;
+    margin: 0 auto 3px;
+    image-rendering: pixelated;
+}
+
+.qr-url {
+    font-size: 7px;
+    overflow-wrap: anywhere;
+}
+
+.barra {
+    display: flex;
+    gap: 8px;
+    width: min(100%, 320px);
+    margin: 12px auto;
+    font-family: system-ui, sans-serif;
+}
+
+.barra button {
+    flex: 1;
+    padding: 8px;
+    cursor: pointer;
+}
+
+.logo {
+    display: block;
+    max-width: 30mm;
+    height: auto;
+    margin: 0 auto 3px;
+    filter: grayscale(1) contrast(200%) brightness(0.9);
+}
+
+.politica {
+    padding-left: 2ch;
+    text-indent: -2ch;
+}
+
+.firma-linea {
+    border: 0;
+    border-top: 1px solid #000;
+    margin: 10mm 0 0;
+    width: 100%;
+}
+
+.pagado {
+    text-align: center;
+    font-weight: 700;
+    margin-top: 3px;
+}
+
+@media print {
+    @page {
+        size: 58mm auto;
+        margin: 0;
+    }
+
+    html,
+    body {
+        width: 58mm !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #fff !important;
+        overflow: visible !important;
+    }
+
+    .ticket {
+        width: var(--ancho-ticket) !important;
+        max-width: var(--ancho-ticket) !important;
+        margin: 0 auto !important;
+        padding: 0 !important;
+        overflow: visible !important;
+    }
+
+    .no-print {
+        display: none !important;
+    }
+}
+
+    </style>
+</head>
+
+<body>
+
+    <div class="barra no-print">
+        <button class="btn-imprimir" type="button" onclick="window.print()">Imprimir</button>
+        <button class="btn-cerrar" type="button" onclick="window.close()">Cerrar</button>
+    </div>
+
+    <div class="ticket">
+
+        {% if configuracion.logo_archivo %}
+        <img class="logo" src="{{ url_for('static', filename='uploads/logos/' ~ configuracion.logo_archivo) }}" alt="Logo">
+        {% endif %}
+        <div class="centro negocio">{{ configuracion.nombre_negocio }}</div>
+        {% if configuracion.lema %}<div class="centro">{{ configuracion.lema }}</div>{% endif %}
+        {% if configuracion.direccion %}<div class="centro">{{ configuracion.direccion }}</div>{% endif %}
+        {% if configuracion.telefono %}<div class="centro">Tel. {{ configuracion.telefono }}</div>{% endif %}
+
+        <hr class="sep">
+        <div class="centro"><strong>COMPROBANTE DE ENTREGA</strong></div>
+        <div class="centro folio">FOLIO {{ pedido.folio }}</div>
+        <hr class="sep">
+
+        <div>Cliente: {{ pedido.nombre_cliente or 'Sin nombre' }}</div>
+        {% if pedido.telefono_cliente %}<div>Tel: {{ pedido.telefono_cliente }}</div>{% endif %}
+        {% if pedido.fecha_creacion %}<div>Pedido: {{ pedido.fecha_creacion.strftime('%d/%m/%Y') }}</div>{% endif %}
+        <div>Entrega:</div>
+        <div>{{ pedido.fecha_entregado.strftime('%d/%m/%Y  %I:%M %p') if pedido.fecha_entregado else '—' }}</div>
+        <div>Entregó: {{ entrego }}</div>
+
+        <hr class="sep">
+
+        {% for d in pedido.detalles %}
+        <div class="item">
+            <div class="desc">{{ d.descripcion }}</div>
+            <div class="fila">
+                <span>{{ '%g'|format(d.cantidad|float) }} x {{ monto(d.precio_unitario) }}</span>
+                <span>{{ monto(d.subtotal) }}</span>
+            </div>
+        </div>
+        {% else %}
+        <div>Sin productos registrados.</div>
+        {% endfor %}
+
+        <hr class="sep">
+
+        <div class="fila total">
+            <span>Total</span>
+            <span>{{ monto(pedido.total) }}</span>
+        </div>
+        {% for p in pagos %}
+        <div class="fila">
+            <span>{{ p.metodo_pago }} {{ p.fecha_pago.strftime('%d/%m/%Y') if p.fecha_pago else '' }}</span>
+            <span>{{ monto(p.monto) }}</span>
+        </div>
+        {% if p.comision and p.comision|float > 0 %}
+        <div class="fila chico">
+            <span>Comisión tarjeta</span>
+            <span>{{ monto(p.comision) }}</span>
+        </div>
+        {% endif %}
+        {% endfor %}
+        <div class="fila">
+            <span>Saldo</span>
+            <span>{{ monto(pedido.saldo_restante) }}</span>
+        </div>
+        {% if pedido.estado_pago == 'Pagado' %}
+        <div class="pagado">** PAGADO **</div>
+        {% endif %}
+
+        {% if apartados %}
+        <hr class="sep">
+        {% for apartado in apartados %}
+        <div class="item">
+            <div><strong>{{ apartado.titulo|upper }}</strong></div>
+            {% for bloque in apartado.bloques %}
+            {% if bloque.subtitulo %}<div>{{ bloque.subtitulo }}</div>{% endif %}
+            {% if bloque.texto %}<div>{{ bloque.texto }}</div>{% endif %}
+            {% endfor %}
+        </div>
+        {% if not loop.last %}<hr class="sep">{% endif %}
+        {% endfor %}
+        {% endif %}
+
+        <hr class="sep">
+        <div><strong>POLÍTICAS</strong></div>
+        {% for politica in politicas %}
+        <div class="politica">• {{ politica }}</div>
+        {% endfor %}
+
+        <hr class="sep">
+        <div>Recibí mi pedido completo, en buen estado y de conformidad, y acepto las políticas anteriores.</div>
+
+        <br><br>
+        <div>Nombre y Firma:</div>
+        <hr class="firma-linea">
+
+        <div class="centro" style="margin-top: 3mm;">¡Gracias por su compra!</div>
+        <div style="height: 8mm;"></div>
+
+    </div>
+
+</body>
+</html>

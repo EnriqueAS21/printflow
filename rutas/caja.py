@@ -14,7 +14,7 @@ from modelos import cajon as modulo_cajon
 from modelos.cajon import abrir_cajon_o_avisar
 from modelos.configuracion_nota import obtener_configuracion_nota
 from modelos.envios import MENSAJE_DUPLICADO, reclamar_envio
-from modelos.pedido import Pago, Pedido
+from modelos.pedido import Pago, Pedido, TASA_COMISION_TARJETA
 from modelos.usuario import Usuario
 from servicios.folios import previsualizar_siguiente_folio
 from servicios.permisos import permiso_requerido
@@ -60,6 +60,19 @@ def _fondo_inicial(inicio):
         return float(fondo.monto or 0)
     corte = _ultimo_corte()
     return float(corte.saldo_final or 0) if corte else 0.0
+
+
+def _repartir_comision(items, total_ticket):
+    """Calcula la comisión de tarjeta del ticket y la reparte entre los items en proporción
+    a su monto. La diferencia de centavos va al último, así la suma es exactamente la total."""
+    comision_total = round(total_ticket * TASA_COMISION_TARJETA, 2)
+    acumulado = 0.0
+    for item in items[:-1]:
+        item.comision = round(comision_total * float(item.monto) / total_ticket, 2)
+        acumulado = round(acumulado + item.comision, 2)
+    if items:
+        items[-1].comision = round(comision_total - acumulado, 2)
+    return comision_total
 
 
 def _resumen_periodo(inicio, fin=None):
@@ -109,20 +122,22 @@ def _resumen_periodo(inicio, fin=None):
 
     for m in mq.all():
         monto = float(m.monto or 0)
+        comision = 0.0 if m.tipo == 'EGRESO' else float(m.comision or 0)
         metodo = (m.metodo_pago or 'Efectivo').strip()
         es_egreso = m.tipo == 'EGRESO'
         destino = egresos if es_egreso else ingresos
         if metodo in destino:
             destino[metodo] += monto
             if not es_egreso:
-                cobrado[metodo] += monto
+                cobrado[metodo] += monto + comision
+        comision_total += comision
         historial.append({
             "tipo": "EGRESO" if es_egreso else "VENTA",
             "origen": "Egreso" if es_egreso else "Mostrador",
             "cantidad": _fmt_cant(m.cantidad or 1),
             "lineas": [m.descripcion],
             "subtotal": -monto if es_egreso else monto,
-            "iva": 0.0, "comision": 0.0,
+            "iva": 0.0, "comision": comision,
             "metodo_pago": metodo, "folio": m.folio or "N/A", "fecha": m.fecha,
         })
 
@@ -231,6 +246,9 @@ def crear_ticket():
             ))
             total_ticket += subtotal
 
+    total_ticket = round(total_ticket, 2)
+    comision_total = _repartir_comision(items, total_ticket) if metodo_pago == 'Tarjeta' else 0.0
+
     if not items:
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return jsonify(success=False, error='No se agregaron productos válidos al ticket.'), 400
@@ -248,7 +266,9 @@ def crear_ticket():
         folio_ticket = f'T-{items[0].id_movimiento:07d}'
         for item in items:
             item.folio = folio_ticket
-        registrar('CAJA_TICKET', 'caja', None, f'Ticket ${total_ticket:.2f} ({metodo_pago}), {len(items)} producto(s)')
+        detalle_comision = f', comisión ${comision_total:.2f}' if comision_total else ''
+        registrar('CAJA_TICKET', 'caja', None,
+                  f'Ticket ${total_ticket:.2f} ({metodo_pago}), {len(items)} producto(s){detalle_comision}')
         db.session.commit()
         cajon_abierto = abrir_cajon_o_avisar() if metodo_pago == 'Efectivo' else None
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
@@ -256,6 +276,8 @@ def crear_ticket():
                 success=True,
                 folio=folio_ticket,
                 total=round(total_ticket, 2),
+                comision=comision_total,
+                total_cobrado=round(total_ticket + comision_total, 2),
                 print_url=url_for('caja.imprimir_ticket', folio=folio_ticket),
             )
             if metodo_pago == 'Efectivo':
@@ -288,6 +310,7 @@ def imprimir_ticket(folio):
         movimientos=movimientos,
         folio=folio,
         total=sum(float(m.monto or 0) for m in movimientos),
+        comision=round(sum(float(m.comision or 0) for m in movimientos), 2),
         fecha=movimientos[0].fecha,
         metodo_pago=movimientos[0].metodo_pago,
         atendio=g.get('usuario'),

@@ -61,6 +61,18 @@
     </div>
     {% endif %}
 
+    {% if pedido.estatus == 'Entregado' and puede('pedidos.imprimir') %}
+    <div class="ficha-sec d-flex justify-content-center">
+      <button type="button"
+              class="btn-ticket"
+              data-ticket-url="{{ url_for('pedidos.ticket_entrega', id_pedido=pedido.id_pedido) }}"
+              onclick="imprimirTicket(this.dataset.ticketUrl)">
+        <i class="bi bi-printer"></i>
+        <span>Ticket de entrega</span>
+      </button>
+    </div>
+    {% endif %}
+
     {% if mostrar_terminar %}
     <div class="mt-4">{{ boton_terminar(pedido, volver='ficha') }}</div>
     {% elif mostrar_entregar %}

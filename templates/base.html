@@ -1023,6 +1023,33 @@
     })();
     </script>
     {% endif %}
+    <script>
+    // Imprime una página de ticket en un iframe oculto (sin abrir pestañas).
+    function imprimirTicket(url) {
+        let f = document.getElementById('frame-ticket');
+        if (!f) {
+            f = document.createElement('iframe');
+            f.id = 'frame-ticket';
+            f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+            document.body.appendChild(f);
+        }
+        f.onload = () => {
+            if (f.contentWindow.location.href === 'about:blank') return;
+            f.contentWindow.focus();
+            f.contentWindow.print();
+        };
+        f.src = url;
+    }
+    window.imprimirTicket = imprimirTicket;
+    </script>
+    {% set id_pedido_ticket_entrega = session.pop('imprimir_ticket_entrega', none) %}
+    {% if id_pedido_ticket_entrega %}
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        imprimirTicket({{ url_for('pedidos.ticket_entrega', id_pedido=id_pedido_ticket_entrega)|tojson }});
+    });
+    </script>
+    {% endif %}
     {% set id_pedido_descarga = session.pop('descargar_pdf', none) %}
     {% if id_pedido_descarga %}
     <span id="auto-descargar-pdf" hidden

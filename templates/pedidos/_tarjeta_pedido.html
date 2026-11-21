@@ -119,7 +119,8 @@
 
       {% if btn_cobrar %}
       <div class="pedido-pago-panel mt-3" id="panel-pago-{{ pedido.id_pedido }}"
-           data-pago-panel data-saldo="{{ '%.2f'|format(pedido.saldo_restante) }}" hidden>
+           data-pago-panel data-saldo="{{ '%.2f'|format(pedido.saldo_restante) }}"
+           data-tasa-comision="{{ TASA_COMISION_TARJETA }}" hidden>
         <div class="pedido-pago-metodos" role="group" aria-label="Método de pago">
           <input type="hidden" data-pago-metodo value="Efectivo">
           <button type="button" class="pedido-pago-metodo active" data-pago-control
@@ -143,6 +144,10 @@
         <div class="pedido-pago-resumen" data-pago-resumen aria-live="polite">
           Este pago <strong>$0.00</strong> · Resta
           <strong class="pedido-pago-resta">${{ '%.2f'|format(pedido.saldo_restante) }}</strong>
+        </div>
+        <div class="pedido-pago-comision small text-primary" data-pago-comision aria-live="polite" hidden>
+          Comisión {{ (TASA_COMISION_TARJETA * 100)|round|int }}%: <strong data-comision>$0.00</strong>
+          · Cobrar en terminal: <strong data-cobro-terminal>$0.00</strong>
         </div>
         <div class="alert alert-danger py-2 mb-0" data-pago-error role="alert" hidden></div>
         <div class="pedido-pago-acciones">
@@ -177,8 +182,13 @@
     {% if btn_imprimir %}
       <button type="button"
               class="acc-sec"
+              {% if pedido.estatus == 'Entregado' -%}
+              title="Imprimir ticket de entrega"
+              data-ticket-url="{{ url_for('pedidos.ticket_entrega', id_pedido=pedido.id_pedido) }}"
+              {%- else -%}
               title="Imprimir ticket"
               data-ticket-url="{{ url_for('pedidos.ticket_pedido', id_pedido=pedido.id_pedido) }}"
+              {%- endif %}
               onclick="imprimirTicket(this.dataset.ticketUrl)">
         <i class="bi bi-printer"></i>
         <span>Ticket</span>
