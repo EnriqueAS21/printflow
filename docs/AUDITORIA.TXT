@@ -1,0 +1,93 @@
+Ready for review
+Select text to add comments on the plan
+Auditoría PrintFlow (Despliegues 1–2 + Paso B) — hallazgos y plan de corrección
+Contexto
+Hoy se tocó mucho código (tablero por fecha de Producción, caché de usuario, Procesos/Reglas/Ruta en productos) con Claude Code y Copilot. Esta auditoría es solo lectura: 3 revisiones paralelas de código. No se ha ejecutado la app, ni Playwright, ni tests propios (modo plan). El recorrido dinámico (roles × 375/1280 px, consola JS) se hará tras aprobar, con BD temporal (SQLite en el scratchpad, borrada al final); ninguna BD real se toca. Las líneas son aproximadas: verificar antes de corregir.
+
+1) Hallazgos priorizados
+Críticos
+#	Área	Archivo:línea	Qué pasa	Reproducir	Corrección
+C1	D/(a) CSRF	app.py:56-77; todos los blueprints	Ninguna protección CSRF (sin Flask-WTF, sin token, sin Origin). Cookies: solo PERMANENT_SESSION_LIFETIME=30 d; HttpOnly=True (default), Secure=False, SameSite sin definir (Firefox/Safari no lo asumen Lax; en LAN por IP "same-site" ignora el puerto). token_envio es nonce de cliente, no CSRF. Un form externo puede crear un admin (POST /usuarios/nuevo), cancelar pedidos, egresos de caja, activar/desactivar procesos	Página externa con <form method=post action=http://HOST:5001/usuarios/nuevo> autoenviado, sesión admin abierta	Ver propuesta CSRF abajo
+C2	A/D fuga	dashboard.py:139,150,316; _columnas_tablero.html:64,109	Producción ve los nombres de todos los operadores en el filtro "Responsable" (8 copias por página). Lista = todos los Usuario rol=Produccion, sin activo, sin filtrar por quien mira	Entrar como Producción → Filtrar → Responsable; o ver-fuente de /dashboard	No pasar operadores si solo_sus_pedidos(); quitar Responsable y Fecha entrega para Producción (H3)
+C3	D fuga	pedidos.py:1100-1102, 1165-1173; servicios/Etiquetas.py:112-215	Producción ve/imprime la etiqueta de cualquier pedido (cliente, teléfono, saldo/PAGADO, notas): tiene etiquetas.imprimir y no se valida es_responsable	Producción: /pedidos/<id>/etiqueta/vista con ids ajenos	es_responsable como en ficha; quitar saldo de etiqueta a Producción
+Altos
+#	Área	Archivo:línea	Qué pasa	Corrección
+A1	A	dashboard.html:1496-1498, 557; _columnas_tablero.html:32-113	Filtros no funcionan en modo pestañas (móvil): hay 2 copias de .filtro-* por columna; querySelector toma la oculta (header). Tampoco hay "Ordenar" en la copia de pestañas	Un solo menú por columna o leer el visible; estado de filtros en objeto JS
+A2	A/(b)	_columnas_tablero.html:54-66, 99-111; dashboard.html:609	Producción hereda Fecha entrega (redundante con columnas por fecha) y Responsable (inútil+fuga). Comentario obsoleto "Solo mis pedidos"	Macro dependiente del rol: Producción solo orden
+A3	A	dashboard.html:358-365, 1364	"Ocultar columnas vacías" solo tiene CSS bajo .kanban-produccion; Admin/Recepción reciben la clase sin efecto en columnas	Extender CSS a .kanban-board o declarar solo-Producción y limpiar
+A4	A	dashboard.py:165,255,70-81; dashboard.html:1633-1642	Zona horaria: columnas con datetime.now() del servidor, recarga de día con reloj del navegador; sin TZ configurada → desfase	zoneinfo explícito; enviar hoy del servidor y recargar cuando /cambios lo cambie
+A5	D/(d)	permisos.py:195-209; app.py:140-147	Sesión vencida → 302 a login también para AJAX: fetch sigue y recibe HTML 200. Ningún 401 JSON. JS: base.html:706 alert "Unexpected token <"; base.html:886,934 polls fallan mudos; stickers.js:649,675 descarga el HTML de login como archivo; dashboard.html:769 y listas.html:101 usan respuesta.url → tras login caen en fragmento sin layout; tablero_sync.js reintenta ante 403 sin avisar	Helper _pide_json(); _exigir_sesion → 401 JSON {ok:false,codigo:'sesion_vencida',login} para AJAX (302 para navegación); wrapper único de fetch en base.html que redirige a login con next correcto. denegar() usa el mismo helper (hoy solo mira X-Requested-With)
+A6	D	autenticacion.py:44-50; usuarios.py:128,191	Sesión sin revocación: logout o cambio de contraseña no invalidan cookies ya emitidas (30 d)	epoch de sesión por usuario comparada en _exigir_sesion
+A7	C	procesos.html:296-343	Renombrar proceso revierte el nombre: cancelarEdicion restaura dataset.original; un Enter posterior guarda el viejo en BD	input.value = dataset.original = resultado.nombre antes de cancelar; actualizar aria-labels
+A8	C/(c)	productos/form.html:80-82; form.js:124-137	Móvil 375 px — Presentaciones: fila con título+badge+4 iconos+"Editar" (~205 px) en overflow-x:auto, flex:0 0 auto, nowrap → acciones fuera de vista; botones 31 px; role="button" con <button> anidados	≤575 px: wrap con acciones en 2ª línea o menú ⋯; áreas ≥44 px
+A9	C/(c)	productos/lista.html:60-61, 85, 94	Móvil 375 px — lista de productos: scroll horizontal interno (acciones nowrap ~185 px, "Desde $" nowrap, Clave/Categoría/Estatus visibles; útil ≈303 px)	Acciones a menú ⋯; categoría/estatus bajo el nombre en <md, o tarjetas
+Medios
+#	Área	Archivo:línea	Qué pasa	Corrección
+M1	D	dashboard.py:249,320,347,403	Rutas del tablero sin @permiso_requerido('dashboard.ver')	Añadirlo (4 rutas)
+M2	D	dashboard.py:66 vs :56; pedidos.py:66,83	_es_produccion() usa nombre de rol; _filtrar_por_rol usa permiso	Unificar en solo_sus_pedidos()
+M3	D	pedidos.py:61-68	Producción abre ficha de pedido Entregado propio	Negar si Entregado
+M4	D	pedidos.py:1131-1163	Producción puede reanudar/reintentar/descartar la cola global de etiquetas y ver toda la cola	Restringir a pedidos.gestionar
+M5	B	autenticacion.py:28-35, permisos.py:76	Login no invalida caché: tras flask crear-admin rebote hasta 60 s	invalidar_usuario en login y logout
+M6	A	dashboard.html:1357,1611; dashboard.py:77	Columna por día pero texto "Vencido" por hora (pedido de hoy 10:00 dice Vencido a las 15:00)	Una sola regla
+M7	A	dashboard.html:11,1370	Modo columnas↔pestañas puede saltar tras primer pintado (Admin/Recepción)	Misma regla servidor/JS
+M8	A/E	dashboard.py:137-153	_contexto_tarjeta (2 consultas) en cada render aunque solo se use perfiles_foto	Separar operadores (solo index) y fotos de responsables visibles
+M9	A/E	dashboard.py:105-110	_por_cobrar_terminados carga todos los pagos en cada poll con cambios	SUM en SQL
+M10	A	dashboard.py:139	Operadores inactivos asignables desde el tablero	activo=True
+M11	C	configuracion.py:351-383; reglas.html:266-286	Caja "prueba" miente: regla "coincide" por búsqueda propia pero la ruta es de otra/Sin clasificar; regla nueva nace con ruta vacía	_ruta_para_datos devuelve la regla usada
+M12	C seg.	reglas.html:278-280	XSS almacenado en innerHTML de la prueba (palabra clave/nombres de proceso)	textContent/escapar
+M13	C	rutas_produccion.py:23-114	Caché: carrera lectura/invalidar() (guarda caché vieja); carga con la sesión de la petición	Contador de generación; sesión aparte
+M14	C	rutas_produccion.py:117-123; configuracion.py:~228	Desactivar proceso en uso: sus rutas se omiten en silencio, sin aviso ni conteo, filtro "Sin ruta" no las lista	Conteo+pfConfirmar, marcar "(inactivo)", filtro
+M15	C	productos.py:864-871; form.js:394-424	Tras 400, "Aplicar a categoría" queda activo con ruta borrador distinta de la guardada	Pasar ruta_guardada real
+M16	C	form.js:~569	Errores de ruta se muestran en #errorPresentaciones, no en .er-error	Mostrar en el editor
+M17	C	configuracion.py:188,306,403-410; productos categorías	Duplicados por lower() dependen de colación (Ñ); "ROTULACIÓN"≠"ROTULACION" aunque el matching las une; categoría exacta en "aplicar a categoría" ("Lonas"/"LONAS"/doble espacio) y destinos incluyen inactivos; carrera → 500 por UNIQUE	Usar nombre_normalizado; normalizar categoría al guardar; capturar IntegrityError
+M18	D/acc.	confirmar.js; _modal_confirmar.html	Foco no vuelve al disparador; sin role=alertdialog/aria-describedby; llamadas superpuestas dejan listeners	Guardar/restaurar foco
+M19	D/acc.	_columnas_tablero.html:10-22; dashboard.html:512,322	Pestañas sin tabpanel/flechas; pestañas inactivas 38 px, expandir ~13 px y contraste 2:1; labels de filtro sin for; tarjeta clicable sin teclado; switches 36×18, ⋯ 40 px, "Opcional" 16 px	Ajustes a ≥44 px, roles ARIA
+M20	F	tests/test_qa_rutas_ui.py:36-38	Los tests parchean rutas_produccion.invalidar pero configuracion.py/productos.py lo importan con from … import → el parche no verifica nada	Parchear en el módulo que lo usa
+M21	D	permisos.py caja	caja.ver (Facturación) ve fondo y efectivo esperado	Confirmar con negocio; permiso separado
+Bajos (limpieza)
+B1 Caché de usuario por proceso (ok con 1 Waitress; documentar). B2 session['usuario_rol'] escrito sin leerse → Set-Cookie en cada poll (permisos.py:208). B3 GET /usuarios/perfil escribe. B4 _destino_seguro acepta /\evil.com (autenticacion.py:11). B5 app.run(debug=True) en app.py:157. B6 quitar en /cambios envía ids de pedidos ajenos (dashboard.py:390). B7 selectinload(Pedido.pagos) innecesario para Producción (pedido.py:485). B8 /buscar sin por_fecha (dashboard.py:424). B9 data-responsable compara por nombre; data-responsables/ids_resp/data-entrega sin uso. B10 Código muerto en macro (caller, col.pedidos is not string, dicts duplicados). B11 ~12 reglas CSS sin uso y duplicadas en dashboard.html (.columna-color-vencidos dos veces con colores distintos); ~600 líneas de CSS en línea; pestañas-carpeta dentro de dashboard.html, no en macro/CSS compartido. B12 .encabezado-pagina vive en clientes/_estilos.html (inyectado como <style> en 9 plantillas, incl. un modal) y solo lo usan Productos/Procesos/Reglas; quedan con h4 distinto: listas, clientes, usuarios, bitácora, notificaciones, nota, reportes; .pantalla-fija solo en Procesos/Reglas con hack !important repetido. B13 eliminar proceso: código muerto, mensaje engañoso, sin botón ni test; reglas sin borrar. B14 flash antes de if es_ajax (configuracion.py:195). B15 N+1 ReglaPaso en reglas (configuracion.py:517) y 2–3 Proceso.query.all() por guardado de producto. B16 SAWarning por delete+add de ReglaPaso (:437). B17 Contratos JSON distintos ({ok,error}, {error}, {success}), str(exc) crudo, reglas() 409 JSON aun sin AJAX, cambiar_estado 404 JSON a forms. B18 MAX_PASOS=8 duplicado en 4 sitios; validaciones distintas producto vs regla. B19 Regla "Cancelar" no restaura; sin blur en edición de procesos; "Copiar ruta" sin confirmar y sin Esc/flechas; ⋯ sin foco al subir/bajar; MutationObserver global. B20 Stickers: cualquier stickers.usar borra plantillas compartidas; signcut devuelve rutas del servidor. B21 print() de depuración en Etiquetas.py:114,251. B22 Botones sin type: revisados, sin fallas.
+
+Rendimiento (E) — resumen
+Sin N+1 en lista de productos (selectinload + NOT EXISTS, con test). Nuevos: N+1 en reglas (B15), _contexto_tarjeta (M8), polls con Set-Cookie (B2). Caché de rutas = 5 consultas completas por invalidación; medir tamaño antes de conectarla al guardado (Paso 3).
+
+Tests (F)
+Cubre: rutas de producto (14), reglas (4), clasificador (6), QA UI (4), caché de usuario (4), estado de líneas (22). Sin test: CRUD de procesos (validaciones, Sin clasificar, subir/bajar, 409), _validar_ruta_regla, rollback/lotes de "aplicar a categoría", categorías con mayúsculas/espacios, búsqueda con acentos, paginación, 400 con ruta borrador, errorhandler(403)/401, todo el tablero por rol (_columna_produccion, /cambios, /buscar, /entregados, ausencia de dinero/nombres ajenos a Producción), etiquetas por rol, CSRF/cookies, sesión vencida AJAX, JS (editor_ruta, confirmar), layout 375 px.
+
+Propuesta CSRF y cookies (a)
+Token por sesión (secrets.token_urlsafe(32)), csrf_token() en context processor y <meta name="csrf-token"> en base.html y login.html (cubre login). Flask-WTF CSRFProtect o ~30 líneas con hmac.compare_digest.
+before_request global para POST/PUT/PATCH/DELETE: exige X-CSRF-Token o campo csrf_token; además valida Origin/Referer contra request.host_url (rechaza null). 403 JSON si AJAX.
+Cliente: un solo script en base.html que envuelve fetch/XHR (añade cabecera same-origin) e inyecta el campo oculto en todo form[method=POST] (captura de submit, cubre forms por JS y fragmentos innerHTML). Faltan hoy: formulario_pedido.js:324, configurador.js:162.
+Cookies: SESSION_COOKIE_SAMESITE='Lax' (no Strict: rompe el QR de etiqueta), HTTPONLY=True, SECURE por variable de entorno cuando haya HTTPS, validar SECRET_KEY ≥32 caracteres, evaluar bajar SESION_DIAS.
+Quitar fallback a request.form en procesos/reglas; atar token_envio a la sesión.
+2) Matriz rol × pantalla × acción (esperado vs. real por lectura de código)
+Pantalla / acción	Admin	Recepción	Producción	Facturación	Real ≠ esperado
+/dashboard columnas	estándar	estándar	por fecha (Vencidos/Hoy/Próximos/Term. hoy)	estándar	OK
+Filtros del tablero	todos	todos	solo orden	todos	Real: Producción ve Fecha entrega + Responsable (C2/A2)
+Filtros en modo pestañas	ok	ok	ok	ok	Real: no filtran en ningún rol (A1)
+Montos/pagos/saldo en tarjeta	sí	sí	no	sí	OK
+/dashboard/entregados	sí	sí	403	sí	OK
+/dashboard/cambios, /buscar	todo	todo	sin Entregado/dinero	todo	quitar filtra ids ajenos (B6)
+Ficha de pedido	todo	todo	solo sus pedidos, sin finanzas	–	Real: abre Entregado propio (M3)
+Etiqueta (vista/imprimir)	sí	sí	solo sus pedidos	sí	Real: cualquiera (C3)
+Cola de etiquetas (reanudar/descartar)	sí	sí	no	no	Real: Producción puede (M4)
+Procesos / Reglas / Productos admin	sí (403 estricto)	403	403	403	OK; falta CSRF (C1)
+Caja (fondo/efectivo esperado)	sí	operar	no	ver	Facturación ve fondo (M21)
+Cualquier POST	token	token	token	token	Real: ninguno valida (C1)
+Sesión vencida en AJAX	401 JSON	idem	idem	idem	Real: 302→HTML 200 (A5)
+Usuario desactivado	bloqueo inmediato	idem	idem	idem	OK (mismo proceso); login rebota ≤60 s (M5)
+3) Bloques de corrección (un prompt por bloque; críticos y altos primero)
+CSRF + cookies — "Implementa el esquema CSRF y de cookies de la sección 'Propuesta CSRF' (token de sesión, before_request con Origin, script único de fetch/forms en base.html y login.html, SameSite=Lax/HttpOnly/Secure por entorno, SECRET_KEY ≥32, quitar fallback a request.form). Agrega tests: POST sin token → 403, con token → ok."
+Etiquetas y cola (C3, M4) — "En rutas/pedidos.py aplica es_responsable a /etiqueta y /etiqueta/vista; restringe reanudar/reintentar/descartar y la lectura de cola global a pedidos.gestionar; quita saldo de la etiqueta para Producción; elimina los print. Tests por rol."
+Filtros del tablero (C2, A1, A2, M10) — "Haz la macro _columnas_tablero.html dependiente del rol: Producción solo orden, sin Responsable ni Fecha entrega; no pasar operadores a Producción; activo=True; un solo menú de filtros por columna que funcione en columnas y pestañas (estado en objeto JS). Test: HTML de Producción sin nombres ajenos."
+Sesión vencida (A5, M5, B2, B4) — "Crea _pide_json(); _exigir_sesion responde 401 JSON a AJAX y 302 a navegación; denegar() usa el helper; wrapper global de fetch que redirige a login (next = página actual); corrige base.html:706,886,934, stickers.js, dashboard.html:769, listas.html:101; invalida caché en login/logout; valida next sin \; quita usuario_rol de la sesión. Tests."
+Permisos del tablero y zona horaria (M1–M3, A4, M6, M7) — "@permiso_requerido('dashboard.ver') en las 4 rutas; _es_produccion vía solo_sus_pedidos; negar ficha Entregado a Producción; zona horaria explícita y hoy del servidor; una sola regla de 'vencido'. Tests de _columna_produccion y /cambios por rol."
+Procesos y reglas (A7, M11–M14, M17, B13–B16) — "Corrige el renombrado en procesos.html; escapa la caja de prueba y devuelve la regla usada desde _ruta_para_datos; contador de generación en la caché; aviso/conteo al desactivar procesos en uso; nombre_normalizado y captura de IntegrityError; selectinload de pasos de reglas; limpia eliminar muerto. Tests de procesos, _validar_ruta_regla, aplicar-a-categoría (rollback, lotes, mayúsculas) y parcheo correcto de invalidar."
+Móvil 375 px (A8, A9, M19) — "Presentaciones (≤575 px: acciones en 2ª línea o menú ⋯, 44 px, sin role=button anidado) y lista de productos (acciones a ⋯, categoría/estatus bajo el nombre); verificar con Playwright a 375 px sin scroll horizontal."
+Producto: ruta guardada y errores (M15, M16, M18) — "Pasa ruta_guardada real al re-render, muestra errores de ruta en .er-error, restaura el foco en pfConfirmar."
+Limpieza y uniformidad (B7–B12, B17–B22, M19) — "Mueve .encabezado-pagina/.pantalla-fija y pestañas-carpeta a CSS compartido, aplícalas uniformemente; borra CSS/JS muerto y duplicado del tablero; unifica contrato JSON y MAX_PASOS; accesibilidad de pestañas/filtros."
+Rendimiento tablero (M8, M9, B7) — "Separa operadores/fotos, SUM en SQL para por-cobrar, con_dinero en con_relaciones_tarjeta; medir con SQL_ECHO=1 antes/después."
+Revocación de sesiones (A6) — "epoch por usuario en sesión, incrementado en logout y cambio de contraseña; migración idempotente."
+Verificación (tras aprobar)
+Crear BD temporal en el scratchpad (nunca las reales), sembrar 4 roles, levantar la app con PRINTFLOW_ENTORNO=desarrollo, recorrer con Playwright a 375 y 1280 px por rol, revisar consola, y borrar la BD y detener el servidor al final.
+Confirmar o descartar cada hallazgo reproducible y marcar en la tabla cuáles quedaron "verificado en vivo".
+pytest completo al cerrar cada bloque.
